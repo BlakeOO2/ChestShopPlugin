@@ -14,9 +14,10 @@ commands:
       §6=== ChestShop Commands ===
       §7/cs info - Get item name for shop creation
       §7/cs help - Show help message
+      §7/cs notifications - Toggle shop notifications
       §7/cs bypass - Toggle sign edit bypass (Admin only)
       §7/cs admin - Allows creating and managing admin shop (Admin only)
-    aliases: [chestshop]
+    aliases: [ chestshop ]
 
 permissions:
   chestshop.create:

@@ -2,9 +2,7 @@ package org.example;
 
 import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.block.Block;
-import org.bukkit.block.Chest;
-import org.bukkit.block.Sign;
+import org.bukkit.block.*;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -17,7 +15,6 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.block.data.type.WallSign;
 import org.bukkit.Bukkit;
 import net.milkbowl.vault.economy.Economy;
-import org.bukkit.block.BlockFace;
 import org.example.ShopSignHandler.PriceInfo;
 
 
@@ -35,33 +32,28 @@ public class ShopListener implements Listener {
             return;
         }
 
-        // Only check for shop if it's attached to a chest
+        // Only check for shop if it's attached to a container
         if (block.getBlockData() instanceof WallSign) {
             WallSign wallSign = (WallSign) block.getBlockData();
             Block attachedBlock = block.getRelative(wallSign.getFacing().getOppositeFace());
 
-            // If sign is attached to a chest, handle it as a potential shop
-            if (attachedBlock.getState() instanceof Chest) {
-                Location signLoc = block.getLocation();
-                ChestShop shop = plugin.getShop(signLoc);
-
-                // If this is an existing shop sign
-                if (shop != null) {
-                    Player player = event.getPlayer();
-                    // Only allow owner or admin in bypass mode to edit
-                    if (!shop.getOwnerName().equals(player.getName()) &&
-                            !(player.hasPermission("chestshop.admin.bypass") && plugin.isInBypassMode(player))) {
-                        event.setCancelled(true);
-                        player.sendMessage("§cYou cannot edit this shop sign!");
-                        return;
-                    }
+            // Check if it's a valid container (only Chest or Barrel)
+            if (attachedBlock.getState() instanceof Chest ||
+                    attachedBlock.getState() instanceof Barrel) {
+                // Only process if this appears to be a shop sign (check format)
+                if (isShopSign(event.getLines())) {
+                    createNewShop(event);
                 }
-
-                // Handle new shop creation
-                createNewShop(event);
+                // If it's not a shop sign, allow normal sign placement
             }
         }
-        // If we get here, it's a regular sign - allow normal editing
+    }
+
+    private boolean isShopSign(String[] lines) {
+        // Check if the sign follows shop format (has B/S price format on line 2)
+        return lines[1] != null &&
+                (lines[1].startsWith("B") || lines[1].startsWith("S")) &&
+                lines[1].matches("^[BS]\\d+(?::[BS]\\d+)?$");
     }
 
     @EventHandler(priority = EventPriority.HIGH)
@@ -71,7 +63,7 @@ public class ShopListener implements Listener {
         }
 
         Block block = event.getClickedBlock();
-        if (!(block.getState() instanceof Chest)) {
+        if (!(block.getState() instanceof Chest || block.getState() instanceof Barrel)) {
             return;
         }
 
@@ -127,7 +119,8 @@ public class ShopListener implements Listener {
         WallSign sign = (WallSign) block.getBlockData();
         Block attachedBlock = block.getRelative(sign.getFacing().getOppositeFace());
 
-        if (!(attachedBlock.getState() instanceof Chest)) {
+        if (!(attachedBlock.getState() instanceof Chest ||
+                attachedBlock.getState() instanceof Barrel)) {
             return;
         }
 
@@ -307,12 +300,26 @@ public class ShopListener implements Listener {
         boughtItems.setAmount(quantity);
         player.getInventory().addItem(boughtItems);
 
-        player.sendMessage("§aSuccessfully bought " + quantity + " items for " + price);
+        String itemName = shop.getItem().hasItemMeta() && shop.getItem().getItemMeta().hasDisplayName()
+                ? shop.getItem().getItemMeta().getDisplayName()
+                : shop.getItem().getType().name().toLowerCase().replace("_", " ");
 
-        // Notify shop owner if they're online
-        Player owner = Bukkit.getPlayer(shop.getOwnerName());
-        if (owner != null && owner.isOnline()) {
-            owner.sendMessage("§a" + player.getName() + " bought " + quantity + " items from your shop for " + price);
+        player.sendMessage(String.format("§aSuccessfully bought %dx %s for $%.2f",
+                quantity, itemName, price));
+
+        // Notify shop owner if they're online and notifications are enabled
+        if (!shop.isAdminShop()) {
+            Player owner = Bukkit.getPlayer(shop.getOwnerName());
+            if (owner != null && owner.isOnline()) {
+                String notification = String.format(
+                        "§a%s bought %dx %s from your shop for $%.2f",
+                        player.getName(),
+                        quantity,
+                        itemName,
+                        price
+                );
+                plugin.getNotificationManager().sendNotification(owner, notification);
+            }
         }
     }
 
@@ -369,13 +376,25 @@ public class ShopListener implements Listener {
         // Add items to chest
         addItemsToChest(chest, shop.getItem(), quantity);
 
-        player.sendMessage("§aSuccessfully sold " + quantity + " items for " + price);
+        String itemName = shop.getItem().hasItemMeta() && shop.getItem().getItemMeta().hasDisplayName()
+                ? shop.getItem().getItemMeta().getDisplayName()
+                : shop.getItem().getType().name().toLowerCase().replace("_", " ");
 
-        // Notify shop owner if they're online
-        if (!shop.isAdminShop()) {  // Only notify for non-admin shops
+        player.sendMessage(String.format("§aSuccessfully sold %dx %s for $%.2f",
+                quantity, itemName, price));
+
+        // Notify shop owner if they're online and notifications are enabled
+        if (!shop.isAdminShop()) {
             Player owner = Bukkit.getPlayer(shop.getOwnerName());
             if (owner != null && owner.isOnline()) {
-                owner.sendMessage("§a" + player.getName() + " sold " + quantity + " items to your shop for " + price);
+                String notification = String.format(
+                        "§a%s sold %dx %s to your shop for $%.2f",
+                        player.getName(),
+                        quantity,
+                        itemName,
+                        price
+                );
+                plugin.getNotificationManager().sendNotification(owner, notification);
             }
         }
     }

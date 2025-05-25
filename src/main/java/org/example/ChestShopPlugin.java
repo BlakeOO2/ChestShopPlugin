@@ -24,6 +24,7 @@ public class ChestShopPlugin extends JavaPlugin {
     private Set<UUID> chestBypassMode = new HashSet<>();
     private String serverName = "Admin Shop";
     private ShopSignHandler signHandler; // Add this line
+    private NotificationManager notificationManager;
 
 
     public boolean toggleBypass(Player player) {
@@ -144,6 +145,8 @@ public class ChestShopPlugin extends JavaPlugin {
         getCommand("cs").setExecutor(new ChestShopCommand(this));
         loadData();
 
+        this.notificationManager = new NotificationManager(this);
+
         this.signHandler = new ShopSignHandler(this);
         getLogger().info("ChestShop Plugin has been enabled!");
     }
@@ -176,6 +179,9 @@ public class ChestShopPlugin extends JavaPlugin {
     public void removeShop(Location location) {
         shops.remove(location);
         saveData();
+    }
+    public NotificationManager getNotificationManager() {
+        return notificationManager;
     }
 
     public ChestShop getShop(Location location) {

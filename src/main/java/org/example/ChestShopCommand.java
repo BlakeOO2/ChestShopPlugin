@@ -43,11 +43,25 @@ public class ChestShopCommand implements CommandExecutor, TabCompleter {
                 return handleAdminCommand(sender, args);
             case "chestbypass":
                 return handleChestBypassCommand(sender);
+            case "notifications":
+            case "notify":
+                return handleNotificationCommand(sender);
             default:
                 sender.sendMessage("§cUnknown command. Type /cs help for help.");
                 return true;
         }
     }
+    private boolean handleNotificationCommand(CommandSender sender) {
+        if (!(sender instanceof Player)) {
+            sender.sendMessage("§cThis command can only be used by players!");
+            return true;
+        }
+
+        Player player = (Player) sender;
+        plugin.getNotificationManager().toggleNotifications(player);
+        return true;
+    }
+
     private boolean handleChestBypassCommand(CommandSender sender) {
         if (!(sender instanceof Player)) {
             sender.sendMessage("§cThis command can only be used by players!");
@@ -108,14 +122,15 @@ public class ChestShopCommand implements CommandExecutor, TabCompleter {
     private boolean handleHelpCommand(CommandSender sender) {
         sender.sendMessage("§6=== ChestShop Help ===");
         sender.sendMessage("§7Create a shop:");
-        sender.sendMessage("§f1. Place a chest");
-        sender.sendMessage("§f2. Attach a sign to the chest");
+        sender.sendMessage("§f1. Place a chest or barrel");
+        sender.sendMessage("§f2. Attach a sign to the container");
         sender.sendMessage("§f3. Line 1: §7Automatically set to your name");
         sender.sendMessage("§f4. Line 2: §7B<price> or B<price>:S<price>");
         sender.sendMessage("§f5. Line 3: §7Quantity of items");
         sender.sendMessage("§f6. Line 4: §7Item name or ? to set later");
         sender.sendMessage("§7Commands:");
         sender.sendMessage("§f/cs info §7- Get item name for shop creation");
+        sender.sendMessage("§f/cs notifications §7- Toggle shop notifications");
         if (sender.hasPermission("chestshop.admin.bypass")) {
             sender.sendMessage("§f/cs bypass §7- Toggle sign edit bypass mode");
         }
@@ -147,7 +162,12 @@ public class ChestShopCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            List<String> completions = new ArrayList<>(Arrays.asList("info", "help"));
+            List<String> completions = new ArrayList<>(Arrays.asList(
+                    "info",
+                    "help",
+                    "notifications",
+                    "notify"
+            ));
             if (sender.hasPermission("chestshop.admin.bypass")) {
                 completions.add("bypass");
             }
