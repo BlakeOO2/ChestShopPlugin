@@ -1,0 +1,42 @@
+name: ChestShopPlugin
+version: '1.1'
+main: org.example.ChestShopPlugin
+api-version: '1.21'
+authors:
+  - Hydrantz
+description: A plugin that allows players to create chest shops
+depend: [Vault]
+
+commands:
+  cs:
+    description: ChestShop commands
+    usage: |
+      §6=== ChestShop Commands ===
+      §7/cs info - Get item name for shop creation
+      §7/cs help - Show help message
+      §7/cs bypass - Toggle sign edit bypass (Admin only)
+      §7/cs admin - Allows creating and managing admin shop (Admin only)
+    aliases: [chestshop]
+
+permissions:
+  chestshop.create:
+    description: Allows creating chest shops
+    default: true
+  chestshop.use:
+    description: Allows using chest shops (buying/selling)
+    default: true
+  chestshop.admin.bypass:
+    description: Allows bypassing shop protection and editing any shop
+    default: op
+  chestshop.admin.remove:
+    description: Allows removing any shop
+    default: op
+  chestshop.admin.create:
+    description: Allows creating and managing admin shops
+    default: op
+  chestshop.admin.chestbypass:
+    description: Allows bypassing chest protection when enabled
+    default: op
+  chestshop.admin.access:
+    description: Allows accessing admin shop chests
+    default: op
