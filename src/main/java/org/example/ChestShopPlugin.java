@@ -16,6 +16,12 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
+import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.enchantments.Enchantment;
+import org.bukkit.inventory.meta.EnchantmentStorageMeta;
+
+
 
 public class ChestShopPlugin extends JavaPlugin {
     private Map<Location, ChestShop> shops = new HashMap<>();
@@ -65,8 +71,38 @@ public class ChestShopPlugin extends JavaPlugin {
         // Save shops
         int i = 0;
         for (Map.Entry<Location, ChestShop> entry : shops.entrySet()) {
-            config.set("shops." + i + ".location", entry.getKey().serialize());
-            config.set("shops." + i + ".data", entry.getValue().serialize());
+            String path = "shops." + i;
+            config.set(path + ".location", entry.getKey().serialize());
+
+            ChestShop shop = entry.getValue();
+            Map<String, Object> shopData = new HashMap<>();
+            shopData.put("owner", shop.getOwnerName());
+            shopData.put("buyPrice", shop.getBuyPrice());
+            shopData.put("sellPrice", shop.getSellPrice());
+            shopData.put("quantity", shop.getQuantity());
+            shopData.put("isAdminShop", shop.isAdminShop());
+            shopData.put("isPending", shop.isPending());
+
+            // Special handling for items, especially enchanted books
+            ItemStack item = shop.getItem();
+            if (item != null) {
+                Map<String, Object> itemData = new HashMap<>();
+                itemData.put("type", item.getType().name());
+                itemData.put("amount", item.getAmount());
+
+                if (item.getType() == Material.ENCHANTED_BOOK && item.hasItemMeta()) {
+                    EnchantmentStorageMeta meta = (EnchantmentStorageMeta) item.getItemMeta();
+                    Map<String, Integer> enchants = new HashMap<>();
+                    for (Map.Entry<Enchantment, Integer> ench : meta.getStoredEnchants().entrySet()) {
+                        enchants.put(ench.getKey().getKey().toString(), ench.getValue());
+                    }
+                    itemData.put("enchantments", enchants);
+                }
+
+                shopData.put("item", itemData);
+            }
+
+            config.set(path + ".data", shopData);
             i++;
         }
 
@@ -98,29 +134,56 @@ public class ChestShopPlugin extends JavaPlugin {
                     ConfigurationSection shopSection = shopsSection.getConfigurationSection(key);
                     if (shopSection == null) continue;
 
+                    // Load location
                     Map<String, Object> locationData = shopSection.getConfigurationSection("location").getValues(true);
                     Location location = Location.deserialize(locationData);
 
-                    Map<String, Object> shopData = shopSection.getConfigurationSection("data").getValues(true);
-                    ChestShop shop = new ChestShop(shopData.get("owner").toString(), location);
+                    // Load shop data
+                    ConfigurationSection dataSection = shopSection.getConfigurationSection("data");
+                    if (dataSection == null) continue;
 
-                    if (shopData.containsKey("buyPrice"))
-                        shop.setBuyPrice(((Number) shopData.get("buyPrice")).doubleValue());
-                    if (shopData.containsKey("sellPrice"))
-                        shop.setSellPrice(((Number) shopData.get("sellPrice")).doubleValue());
-                    if (shopData.containsKey("quantity"))
-                        shop.setQuantity(((Number) shopData.get("quantity")).intValue());
-                    if (shopData.containsKey("isAdminShop"))
-                        shop.setAdminShop((Boolean) shopData.get("isAdminShop"));
-                    if (shopData.containsKey("isPending"))
-                        shop.setPending((Boolean) shopData.get("isPending"));
-                    if (shopData.containsKey("item")) {
-                        Map<String, Object> itemData = shopSection.getConfigurationSection("data.item").getValues(true);
-                        shop.setItem(ItemStack.deserialize(itemData));
+                    // Create shop
+                    String owner = dataSection.getString("owner");
+                    ChestShop shop = new ChestShop(owner, location);
+
+                    // Load basic data
+                    shop.setBuyPrice(dataSection.getDouble("buyPrice", -1));
+                    shop.setSellPrice(dataSection.getDouble("sellPrice", -1));
+                    shop.setQuantity(dataSection.getInt("quantity", 0));
+                    shop.setAdminShop(dataSection.getBoolean("isAdminShop", false));
+                    shop.setPending(dataSection.getBoolean("isPending", false));
+
+                    // Load item
+                    ConfigurationSection itemSection = dataSection.getConfigurationSection("item");
+                    if (itemSection != null) {
+                        Material type = Material.valueOf(itemSection.getString("type"));
+                        int amount = itemSection.getInt("amount", 1);
+                        ItemStack item = new ItemStack(type, amount);
+
+                        // Handle enchanted books
+                        if (type == Material.ENCHANTED_BOOK) {
+                            EnchantmentStorageMeta meta = (EnchantmentStorageMeta) item.getItemMeta();
+                            ConfigurationSection enchants = itemSection.getConfigurationSection("enchantments");
+                            if (enchants != null) {
+                                for (String enchantKey : enchants.getKeys(false)) {
+                                    NamespacedKey namespacedKey = NamespacedKey.fromString(enchantKey);
+                                    if (namespacedKey != null) {
+                                        Enchantment enchantment = Enchantment.getByKey(namespacedKey);
+                                        if (enchantment != null) {
+                                            meta.addStoredEnchant(enchantment, enchants.getInt(enchantKey), true);
+                                        }
+                                    }
+                                }
+                            }
+                            item.setItemMeta(meta);
+                        }
+
+                        shop.setItem(item);
                     }
 
                     shops.put(location, shop);
                     getLogger().info("Loaded shop at " + location.toString());
+
                 } catch (Exception e) {
                     getLogger().warning("Failed to load shop at index " + key + ": " + e.getMessage());
                     e.printStackTrace();
@@ -128,6 +191,7 @@ public class ChestShopPlugin extends JavaPlugin {
             }
         }
     }
+
 
     @Override
     public void onEnable() {

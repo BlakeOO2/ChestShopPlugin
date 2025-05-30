@@ -17,6 +17,8 @@ import org.bukkit.Bukkit;
 import net.milkbowl.vault.economy.Economy;
 import org.example.ShopSignHandler.PriceInfo;
 
+import java.util.HashMap;
+
 
 public class ShopListener implements Listener {
     private final ChestShopPlugin plugin;
@@ -57,19 +59,21 @@ public class ShopListener implements Listener {
     }
 
     @EventHandler(priority = EventPriority.HIGH)
-    public void onChestAccess(PlayerInteractEvent event) {
+    public void onContainerAccess(PlayerInteractEvent event) {
         if (event.getAction() != Action.RIGHT_CLICK_BLOCK || event.getClickedBlock() == null) {
             return;
         }
 
         Block block = event.getClickedBlock();
-        if (!(block.getState() instanceof Chest || block.getState() instanceof Barrel)) {
+        if (!(block.getState() instanceof Container)) {
             return;
         }
 
-        // Check if this chest is part of a shop
+        // Check if this container is part of a shop
         Block signBlock = findAttachedSign(block);
-        if (signBlock == null) return;
+        if (signBlock == null) {
+            return;
+        }
 
         ChestShop shop = plugin.getShop(signBlock.getLocation());
         if (shop == null) {
@@ -90,7 +94,7 @@ public class ShopListener implements Listener {
 
         // Deny access
         event.setCancelled(true);
-        player.sendMessage("§cYou don't have permission to access this shop chest!");
+        player.sendMessage("§cYou don't have permission to access this shop container!");
     }
 
     private Block findAttachedSign(Block chestBlock) {
@@ -259,66 +263,77 @@ public class ShopListener implements Listener {
         double price = shop.getBuyPrice();
         int quantity = shop.getQuantity();
 
+        // Create the ItemStack that would be given to the player
+        ItemStack itemToGive = shop.getItem().clone();
+        itemToGive.setAmount(quantity);
+
+        // Check if player has enough inventory space FIRST
+        if (!hasEnoughSpace(player, itemToGive)) {
+            player.sendMessage("§cYour inventory is full! Free up some space first.");
+            return;
+        }
+
         // Check if player has enough money
         if (!economy.has(player, price)) {
-            player.sendMessage("§cYou don't have enough money! You need: " + price);
+            player.sendMessage("§cYou don't have enough money! You need: $" + price);
             return;
         }
 
-        // Get the attached chest
+        // Get the attached container
         Block signBlock = shop.getLocation().getBlock();
-        Block chestBlock = getAttachedChest(signBlock);
-        if (chestBlock == null || !(chestBlock.getState() instanceof Chest)) {
-            player.sendMessage("§cShop chest not found!");
+        Container container = getAttachedContainer(signBlock);
+        if (container == null) {
+            player.sendMessage("§cShop container not found!");
             return;
         }
-
-        Chest chest = (Chest) chestBlock.getState();
 
         // Check if shop has enough items
-        if (!hasEnoughItems(chest, shop.getItem(), quantity, shop)) {
+        if (!hasEnoughItems(container, shop.getItem(), quantity, shop)) {
             player.sendMessage("§cShop is out of stock!");
             return;
         }
 
-        // Check if player has enough inventory space
-        if (!hasEnoughSpace(player, shop.getItem(), quantity)) {
-            player.sendMessage("§cYour inventory is full!");
-            return;
-        }
-
-        // Process transaction
+        // Process transaction ONLY after all checks have passed
         economy.withdrawPlayer(player, price);
         if (!shop.isAdminShop()) {
             economy.depositPlayer(Bukkit.getOfflinePlayer(shop.getOwnerName()), price);
         }
-        // Remove items from chest
-        removeItemsFromChest(chest, shop.getItem(), quantity);
 
-        // Give items to player
-        ItemStack boughtItems = shop.getItem().clone();
-        boughtItems.setAmount(quantity);
-        player.getInventory().addItem(boughtItems);
+        // Remove items from container
+        removeItemsFromContainer(container, shop.getItem(), quantity);
 
-        String itemName = shop.getItem().hasItemMeta() && shop.getItem().getItemMeta().hasDisplayName()
-                ? shop.getItem().getItemMeta().getDisplayName()
-                : shop.getItem().getType().name().toLowerCase().replace("_", " ");
+        // Give items to player - This should never fail now because we checked space
+        HashMap<Integer, ItemStack> leftover = player.getInventory().addItem(itemToGive);
 
+        // Extra safety check - if somehow items couldn't be added, refund and return items
+        if (!leftover.isEmpty()) {
+            // Refund the player
+            economy.depositPlayer(player, price);
+            // Return items to container if not admin shop
+            if (!shop.isAdminShop()) {
+                addItemsToContainer(container, shop.getItem(), quantity);
+            }
+            player.sendMessage("§cError processing transaction - you have been refunded.");
+            return;
+        }
+
+        // Success message
         player.sendMessage(String.format("§aSuccessfully bought %dx %s for $%.2f",
-                quantity, itemName, price));
+                quantity,
+                shop.getItem().getType().name().toLowerCase().replace("_", " "),
+                price));
 
-        // Notify shop owner if they're online and notifications are enabled
+        // Notify shop owner if they're online
         if (!shop.isAdminShop()) {
             Player owner = Bukkit.getPlayer(shop.getOwnerName());
             if (owner != null && owner.isOnline()) {
-                String notification = String.format(
+                plugin.getNotificationManager().sendNotification(owner, String.format(
                         "§a%s bought %dx %s from your shop for $%.2f",
                         player.getName(),
                         quantity,
-                        itemName,
+                        shop.getItem().getType().name().toLowerCase().replace("_", " "),
                         price
-                );
-                plugin.getNotificationManager().sendNotification(owner, notification);
+                ));
             }
         }
     }
@@ -350,17 +365,15 @@ public class ShopListener implements Listener {
 
         // Get the attached chest
         Block signBlock = shop.getLocation().getBlock();
-        Block chestBlock = getAttachedChest(signBlock);
-        if (chestBlock == null || !(chestBlock.getState() instanceof Chest)) {
-            player.sendMessage("§cShop chest not found!");
+        Container container = getAttachedContainer(signBlock);
+        if (container == null) {
+            player.sendMessage("§cShop container not found!");
             return;
         }
 
-        Chest chest = (Chest) chestBlock.getState();
-
-        // Check if chest has enough space
-        if (!hasEnoughSpace(chest, shop.getItem(), quantity, shop)) {
-            player.sendMessage("§cShop chest is full!");
+        // Check if container has enough space
+        if (!hasEnoughSpaceInContainer(container, shop.getItem(), quantity, shop)) {
+            player.sendMessage("§cShop container is full!");
             return;
         }
 
@@ -368,13 +381,10 @@ public class ShopListener implements Listener {
         if (!shop.isAdminShop()) {
             economy.withdrawPlayer(Bukkit.getOfflinePlayer(shop.getOwnerName()), price);
         }
-        economy.depositPlayer(player, price); // Player always gets money, even from admin shops
+        economy.depositPlayer(player, price);
 
-        // Remove items from player
         removeItemsFromPlayer(player, shop.getItem(), quantity);
-
-        // Add items to chest
-        addItemsToChest(chest, shop.getItem(), quantity);
+        addItemsToContainer(container, shop.getItem(), quantity);
 
         String itemName = shop.getItem().hasItemMeta() && shop.getItem().getItemMeta().hasDisplayName()
                 ? shop.getItem().getItemMeta().getDisplayName()
@@ -399,6 +409,21 @@ public class ShopListener implements Listener {
         }
     }
 
+    private boolean hasEnoughSpaceInContainer(Container container, ItemStack item, int quantity, ChestShop shop) {
+        if (shop.isAdminShop()) {
+            return true; // Admin shops have unlimited space
+        }
+        int freeSpace = 0;
+        for (ItemStack stack : container.getInventory().getContents()) {
+            if (stack == null) {
+                freeSpace += item.getMaxStackSize();
+            } else if (stack.isSimilar(item)) {
+                freeSpace += item.getMaxStackSize() - stack.getAmount();
+            }
+        }
+        return freeSpace >= quantity;
+    }
+
 
     private boolean hasEnoughItems(Player player, ItemStack item, int quantity) {
         int count = 0;
@@ -410,12 +435,12 @@ public class ShopListener implements Listener {
         return count >= quantity;
     }
 
-    private boolean hasEnoughItems(Chest chest, ItemStack item, int quantity, ChestShop shop) {
+    private boolean hasEnoughItems(Container container, ItemStack item, int quantity, ChestShop shop) {
         if (shop.isAdminShop()) {
-            return true; // Admin shops have unlimited stock
+            return true;
         }
         int count = 0;
-        for (ItemStack stack : chest.getInventory().getContents()) {
+        for (ItemStack stack : container.getInventory().getContents()) {
             if (stack != null && stack.isSimilar(item)) {
                 count += stack.getAmount();
             }
@@ -423,19 +448,30 @@ public class ShopListener implements Listener {
         return count >= quantity;
     }
 
-    private boolean hasEnoughSpace(Chest chest, ItemStack item, int quantity, ChestShop shop) {
-        if (shop.isAdminShop()) {
-            return true; // Admin shops have unlimited space
-        }
-        int freeSpace = 0;
-        for (ItemStack stack : chest.getInventory().getContents()) {
-            if (stack == null) {
-                freeSpace += item.getMaxStackSize();
-            } else if (stack.isSimilar(item)) {
-                freeSpace += item.getMaxStackSize() - stack.getAmount();
+    private boolean hasEnoughSpace(Player player, ItemStack itemToAdd) {
+        // Clone the inventory to simulate adding items
+        ItemStack[] contents = player.getInventory().getStorageContents().clone();
+        ItemStack remaining = itemToAdd.clone();
+
+        // Try to fit the item into existing stacks first
+        for (int i = 0; i < contents.length && remaining.getAmount() > 0; i++) {
+            ItemStack slot = contents[i];
+            if (slot == null) {
+                // Empty slot - can fit a full stack
+                int toAdd = Math.min(remaining.getAmount(), remaining.getMaxStackSize());
+                remaining.setAmount(remaining.getAmount() - toAdd);
+            } else if (slot.isSimilar(remaining)) {
+                // Similar item - check remaining stack space
+                int canAdd = slot.getMaxStackSize() - slot.getAmount();
+                if (canAdd > 0) {
+                    int toAdd = Math.min(remaining.getAmount(), canAdd);
+                    remaining.setAmount(remaining.getAmount() - toAdd);
+                }
             }
         }
-        return freeSpace >= quantity;
+
+        // If remaining is 0, we found space for everything
+        return remaining.getAmount() == 0;
     }
 
     private boolean hasEnoughSpace(Player player, ItemStack item, int quantity) {
@@ -469,16 +505,16 @@ public class ShopListener implements Listener {
         player.updateInventory();
     }
 
-    private void removeItemsFromChest(Chest chest, ItemStack itemToRemove, int amount) {
+    private void removeItemsFromContainer(Container container, ItemStack itemToRemove, int amount) {
         int remaining = amount;
-        ItemStack[] contents = chest.getInventory().getContents();
+        ItemStack[] contents = container.getInventory().getContents();
 
         for (int i = 0; i < contents.length && remaining > 0; i++) {
             ItemStack item = contents[i];
             if (item != null && item.isSimilar(itemToRemove)) {
                 if (item.getAmount() <= remaining) {
                     remaining -= item.getAmount();
-                    chest.getInventory().setItem(i, null);
+                    container.getInventory().setItem(i, null);
                 } else {
                     item.setAmount(item.getAmount() - remaining);
                     remaining = 0;
@@ -487,19 +523,25 @@ public class ShopListener implements Listener {
         }
     }
 
-    private void addItemsToChest(Chest chest, ItemStack item, int amount) {
+    private void addItemsToContainer(Container container, ItemStack item, int amount) {
         ItemStack toAdd = item.clone();
         toAdd.setAmount(amount);
-        chest.getInventory().addItem(toAdd);
+        container.getInventory().addItem(toAdd);
     }
 
-    private Block getAttachedChest(Block signBlock) {
+    private Container getAttachedContainer(Block signBlock) {
         if (!(signBlock.getBlockData() instanceof WallSign)) {
             return null;
         }
         WallSign sign = (WallSign) signBlock.getBlockData();
-        return signBlock.getRelative(sign.getFacing().getOppositeFace());
+        Block attachedBlock = signBlock.getRelative(sign.getFacing().getOppositeFace());
+
+        if (attachedBlock.getState() instanceof Container) {
+            return (Container) attachedBlock.getState();
+        }
+        return null;
     }
+
 
     @EventHandler
     public void onSignBreak(BlockBreakEvent event) {

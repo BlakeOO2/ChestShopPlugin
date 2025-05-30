@@ -2,6 +2,10 @@ package org.example;
 
 import org.bukkit.Location;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.enchantments.Enchantment;
+import org.bukkit.inventory.meta.EnchantmentStorageMeta;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -78,15 +82,27 @@ public class ChestShop {
     public Map<String, Object> serialize() {
         Map<String, Object> data = new HashMap<>();
         data.put("owner", ownerName);
-        // Don't serialize the location here as it's stored separately
         data.put("buyPrice", buyPrice);
         data.put("sellPrice", sellPrice);
         data.put("quantity", quantity);
         data.put("isAdminShop", isAdminShop);
-        if (item != null) {
-            data.put("item", item.serialize());
-        }
         data.put("isPending", isPending);
+
+        // Special handling for enchanted books
+        if (item != null) {
+            Map<String, Object> itemData = item.serialize();
+            // Store meta data separately for enchanted books
+            if (item.getType() == Material.ENCHANTED_BOOK && item.hasItemMeta()) {
+                EnchantmentStorageMeta meta = (EnchantmentStorageMeta) item.getItemMeta();
+                Map<String, Integer> enchants = new HashMap<>();
+                for (Map.Entry<Enchantment, Integer> entry : meta.getStoredEnchants().entrySet()) {
+                    enchants.put(entry.getKey().getKey().toString(), entry.getValue());
+                }
+                itemData.put("stored-enchants", enchants);
+            }
+            data.put("item", itemData);
+        }
+
         return data;
     }
 
@@ -116,12 +132,29 @@ public class ChestShop {
             }
 
             if (data.containsKey("item")) {
-                Object itemData = data.get("item");
-                if (itemData instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> itemData = (Map<String, Object>) data.get("item");
+                ItemStack item = ItemStack.deserialize(itemData);
+
+                // Handle enchanted books
+                if (item.getType() == Material.ENCHANTED_BOOK && itemData.containsKey("stored-enchants")) {
+                    EnchantmentStorageMeta meta = (EnchantmentStorageMeta) item.getItemMeta();
                     @SuppressWarnings("unchecked")
-                    Map<String, Object> itemMap = (Map<String, Object>) itemData;
-                    shop.setItem(ItemStack.deserialize(itemMap));
+                    Map<String, Integer> enchants = (Map<String, Integer>) itemData.get("stored-enchants");
+
+                    for (Map.Entry<String, Integer> entry : enchants.entrySet()) {
+                        NamespacedKey key = NamespacedKey.fromString(entry.getKey());
+                        if (key != null) {
+                            Enchantment ench = Enchantment.getByKey(key);
+                            if (ench != null) {
+                                meta.addStoredEnchant(ench, entry.getValue(), true);
+                            }
+                        }
+                    }
+                    item.setItemMeta(meta);
                 }
+
+                shop.setItem(item);
             }
 
             return shop;
