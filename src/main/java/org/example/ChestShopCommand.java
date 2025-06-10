@@ -249,10 +249,10 @@ public class ChestShopCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        // Check permissions
-        if (!shop.getOwnerName().equals(player.getName()) &&
-                !player.hasPermission("chestshop.admin.setowner")) {
-            player.sendMessage("§cYou don't have permission to modify this shop!");
+        // Check ownership based on the first line of the sign
+        String ownerName = sign.getLine(0);
+        if (!ownerName.equals(player.getName()) && !player.hasPermission("chestshop.admin.setowner")) {
+            player.sendMessage("§cYou can only modify your own shops!");
             return true;
         }
 
@@ -265,7 +265,11 @@ public class ChestShopCommand implements CommandExecutor, TabCompleter {
         };
 
         if (!isValid) {
-            player.sendMessage("§cInvalid format for line " + line);
+            switch (line) {
+                case 2 -> player.sendMessage("§cInvalid price format! Use BX:SX, BFREE:SX, BX:SFREE, or similar");
+                case 3 -> player.sendMessage("§cInvalid quantity! Must be a positive number");
+                case 4 -> player.sendMessage("§cInvalid item name! Use a valid item name or ?");
+            }
             return true;
         }
 
