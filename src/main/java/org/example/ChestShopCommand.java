@@ -332,12 +332,24 @@ public class ChestShopCommand implements CommandExecutor, TabCompleter {
             }
         }
     }
+    private void sendChangeUsage(Player player) {
+        player.sendMessage("§6=== ChestShop Change Command ===");
+        player.sendMessage("§7Usage: /cs change <line> <text>");
+        player.sendMessage("§7Line 2: §fBX:SX, BFREE:SX, BX:SFREE (prices)");
+        player.sendMessage("§7Line 3: §fQuantity (positive number)");
+        player.sendMessage("§7Line 4: §fItem name or ?");
+        player.sendMessage("§7Examples:");
+        player.sendMessage("§f/cs change 2 B10:S5");
+        player.sendMessage("§f/cs change 2 BFREE:S10");
+        player.sendMessage("§f/cs change 3 64");
+        player.sendMessage("§f/cs change 4 DIAMOND");
+    }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
             List<String> completions = new ArrayList<>(Arrays.asList(
-                    "info", "help", "notifications", "notify"
+                    "info", "help", "notifications", "notify", "change"
             ));
             if (sender.hasPermission("chestshop.admin.bypass")) {
                 completions.add("bypass");
@@ -345,12 +357,20 @@ public class ChestShopCommand implements CommandExecutor, TabCompleter {
             if (sender.hasPermission("chestshop.admin.setowner")) {
                 completions.add("setowner");
             }
-            completions.add("change");
             return completions.stream()
                     .filter(s -> s.toLowerCase().startsWith(args[0].toLowerCase()))
                     .collect(Collectors.toList());
         } else if (args.length == 2 && args[0].equalsIgnoreCase("change")) {
             return Arrays.asList("2", "3", "4");
+        } else if (args.length == 3 && args[0].equalsIgnoreCase("change")) {
+            switch (args[1]) {
+                case "2":
+                    return Arrays.asList("B<price>:S<price>", "BFREE:S<price>", "B<price>:SFREE", "BFREE", "SFREE");
+                case "3":
+                    return Arrays.asList("1", "16", "32", "64");
+                case "4":
+                    return Arrays.asList("?", "DIAMOND", "IRON_INGOT", "GOLD_INGOT");
+            }
         }
         return new ArrayList<>();
     }
