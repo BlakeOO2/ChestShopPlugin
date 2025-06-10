@@ -163,6 +163,10 @@ public class ChestShop {
         }
     }
 
+    public void setOwnerName(String ownerName) {
+        this.ownerName = ownerName;
+    }
+
 
     public boolean isAdminShop() { return isAdminShop; }
     public void setAdminShop(boolean adminShop) { isAdminShop = adminShop; }

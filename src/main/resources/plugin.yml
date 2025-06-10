@@ -41,3 +41,6 @@ permissions:
   chestshop.admin.access:
     description: Allows accessing admin shop chests
     default: op
+  chestshop.admin.setowner:
+    description: Allows admin to set the owner name on chest shops
+    default: op

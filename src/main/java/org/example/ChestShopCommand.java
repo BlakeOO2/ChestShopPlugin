@@ -1,6 +1,8 @@
 package org.example;
 
 import org.bukkit.Material;
+import org.bukkit.block.Block;
+import org.bukkit.block.Sign;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -46,6 +48,10 @@ public class ChestShopCommand implements CommandExecutor, TabCompleter {
             case "notifications":
             case "notify":
                 return handleNotificationCommand(sender);
+            case "setowner":
+                return handleSetOwnerCommand(sender, args);
+            case "change":
+                return handleChangeCommand(sender, args);
             default:
                 sender.sendMessage("§cUnknown command. Type /cs help for help.");
                 return true;
@@ -159,22 +165,184 @@ public class ChestShopCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+
+
+
+    private boolean handleSetOwnerCommand(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage("§cThis command can only be used by players!");
+            return true;
+        }
+
+        if (!sender.hasPermission("chestshop.admin.setowner")) {
+            sender.sendMessage("§cYou don't have permission to set shop owners!");
+            return true;
+        }
+
+        if (args.length < 2) {
+            sender.sendMessage("§cUsage: /cs setowner <player name>");
+            return true;
+        }
+
+        // Get the sign the player is looking at
+        Block targetBlock = player.getTargetBlock(null, 5);
+        if (!(targetBlock.getState() instanceof Sign sign)) {
+            player.sendMessage("§cYou must be looking at a shop sign!");
+            return true;
+        }
+
+        // Check if it's a shop
+        ChestShop shop = plugin.getShop(targetBlock.getLocation());
+        if (shop == null) {
+            player.sendMessage("§cThis is not a shop sign!");
+            return true;
+        }
+
+        // Set the new owner
+        String newOwner = args[1];
+        shop.setOwnerName(newOwner);
+        sign.setLine(0, newOwner);
+        sign.update();
+        plugin.addShop(targetBlock.getLocation(), shop);
+
+        player.sendMessage("§aShop owner has been set to: " + newOwner);
+        return true;
+    }
+
+    private boolean handleChangeCommand(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage("§cThis command can only be used by players!");
+            return true;
+        }
+
+        if (args.length < 3) {
+            sender.sendMessage("§cUsage: /cs change <line: 2|3|4> <text>");
+            return true;
+        }
+
+        // Parse line number
+        int line;
+        try {
+            line = Integer.parseInt(args[1]);
+            if (line < 2 || line > 4) {
+                throw new NumberFormatException();
+            }
+        } catch (NumberFormatException e) {
+            player.sendMessage("§cInvalid line number! Must be 2, 3, or 4");
+            return true;
+        }
+
+        // Get the text (combine remaining args)
+        String text = String.join(" ", Arrays.copyOfRange(args, 2, args.length));
+
+        // Get the sign the player is looking at
+        Block targetBlock = player.getTargetBlock(null, 5);
+        if (!(targetBlock.getState() instanceof Sign sign)) {
+            player.sendMessage("§cYou must be looking at a shop sign!");
+            return true;
+        }
+
+        // Check if it's a shop
+        ChestShop shop = plugin.getShop(targetBlock.getLocation());
+        if (shop == null) {
+            player.sendMessage("§cThis is not a shop sign!");
+            return true;
+        }
+
+        // Check permissions
+        if (!shop.getOwnerName().equals(player.getName()) &&
+                !player.hasPermission("chestshop.admin.setowner")) {
+            player.sendMessage("§cYou don't have permission to modify this shop!");
+            return true;
+        }
+
+        // Validate the new text based on the line number
+        boolean isValid = switch (line) {
+            case 2 -> validatePriceLine(text);
+            case 3 -> validateQuantityLine(text);
+            case 4 -> validateItemLine(text);
+            default -> false;
+        };
+
+        if (!isValid) {
+            player.sendMessage("§cInvalid format for line " + line);
+            return true;
+        }
+
+        // Update the shop based on the line
+        updateShopLine(shop, sign, line, text);
+        sign.update();
+        plugin.addShop(targetBlock.getLocation(), shop);
+
+        player.sendMessage("§aShop has been updated successfully!");
+        return true;
+    }
+
+    private boolean validatePriceLine(String text) {
+        return plugin.getSignHandler().parsePriceLine(text).isValid();
+    }
+
+    private boolean validateQuantityLine(String text) {
+        try {
+            int quantity = Integer.parseInt(text);
+            return quantity > 0;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    private boolean validateItemLine(String text) {
+        return text.equals("?") || Material.matchMaterial(text) != null;
+    }
+
+    private void updateShopLine(ChestShop shop, Sign sign, int line, String text) {
+        switch (line) {
+            case 2 -> {
+                ShopSignHandler.PriceInfo prices = plugin.getSignHandler().parsePriceLine(text);
+                shop.setBuyPrice(prices.getBuyPrice());
+                shop.setSellPrice(prices.getSellPrice());
+                sign.setLine(1, text);
+            }
+            case 3 -> {
+                shop.setQuantity(Integer.parseInt(text));
+                sign.setLine(2, text);
+            }
+            case 4 -> {
+                if (text.equals("?")) {
+                    shop.setPending(true);
+                    shop.setItem(null);
+                } else {
+                    Material material = Material.matchMaterial(text);
+                    if (material != null) {
+                        shop.setItem(new ItemStack(material));
+                        shop.setPending(false);
+                    }
+                }
+                sign.setLine(3, text);
+            }
+        }
+    }
+
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
             List<String> completions = new ArrayList<>(Arrays.asList(
-                    "info",
-                    "help",
-                    "notifications",
-                    "notify"
+                    "info", "help", "notifications", "notify"
             ));
             if (sender.hasPermission("chestshop.admin.bypass")) {
                 completions.add("bypass");
             }
+            if (sender.hasPermission("chestshop.admin.setowner")) {
+                completions.add("setowner");
+            }
+            completions.add("change");
             return completions.stream()
                     .filter(s -> s.toLowerCase().startsWith(args[0].toLowerCase()))
                     .collect(Collectors.toList());
+        } else if (args.length == 2 && args[0].equalsIgnoreCase("change")) {
+            return Arrays.asList("2", "3", "4");
         }
         return new ArrayList<>();
     }
+}
 }
