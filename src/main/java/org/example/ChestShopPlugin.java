@@ -99,69 +99,40 @@ public class ChestShopPlugin extends JavaPlugin {
                 itemData.put("type", item.getType().name());
                 itemData.put("amount", item.getAmount());
 
-                // Handle special items
+                // Handle item meta
                 if (item.hasItemMeta()) {
-                    switch (item.getType()) {
-                        case ENCHANTED_BOOK:
-                            if (item.getItemMeta() instanceof EnchantmentStorageMeta meta) {
-                                Map<String, Integer> enchants = new HashMap<>();
-                                for (Map.Entry<Enchantment, Integer> ench : meta.getStoredEnchants().entrySet()) {
-                                    enchants.put(ench.getKey().getKey().toString(), ench.getValue());
-                                }
-                                itemData.put("enchantments", enchants);
-                            }
-                            break;
+                    ItemMeta meta = item.getItemMeta();
 
-                        case SHULKER_BOX:
-                        case BLACK_SHULKER_BOX:
-                        case BLUE_SHULKER_BOX:
-                        case BROWN_SHULKER_BOX:
-                        case CYAN_SHULKER_BOX:
-                        case GRAY_SHULKER_BOX:
-                        case GREEN_SHULKER_BOX:
-                        case LIGHT_BLUE_SHULKER_BOX:
-                        case LIGHT_GRAY_SHULKER_BOX:
-                        case LIME_SHULKER_BOX:
-                        case MAGENTA_SHULKER_BOX:
-                        case ORANGE_SHULKER_BOX:
-                        case PINK_SHULKER_BOX:
-                        case PURPLE_SHULKER_BOX:
-                        case RED_SHULKER_BOX:
-                        case WHITE_SHULKER_BOX:
-                        case YELLOW_SHULKER_BOX:
-                            if (item.getItemMeta() instanceof BlockStateMeta meta) {
-                                if (meta.getBlockState() instanceof ShulkerBox shulker) {
-                                    itemData.put("shulker_contents", shulker.getInventory().getContents());
-                                }
-                            }
-                            break;
-
-                        case AXOLOTL_BUCKET:
-                        case PUFFERFISH_BUCKET:
-                        case SALMON_BUCKET:
-                        case COD_BUCKET:
-                        case TROPICAL_FISH_BUCKET:
-                        case TADPOLE_BUCKET:
-                            if (item.hasItemMeta()) {
-                                PersistentDataContainer container = item.getItemMeta().getPersistentDataContainer();
-                                Map<String, Object> bucketData = new HashMap<>();
-                                // Save any custom NBT data
-                                for (NamespacedKey nbtKey : container.getKeys()) {
-                                    bucketData.put(nbtKey.toString(), container.get(nbtKey, PersistentDataType.STRING));
-                                }
-                                if (!bucketData.isEmpty()) {
-                                    itemData.put("bucket_data", bucketData);
-                                }
-                            }
-                            break;
+                    // Save display name if present
+                    if (meta.hasDisplayName()) {
+                        itemData.put("display_name", meta.getDisplayName());
                     }
 
-                    // Save display name and lore if present
-                    if (item.getItemMeta().hasDisplayName()) {
-                        itemData.put("display_name", item.getItemMeta().getDisplayName());
+                    // Save lore if present
+                    if (meta.hasLore()) {
+                        itemData.put("lore", meta.getLore());
                     }
-                    if (item.getItemMeta().hasLore()) {
-                        itemData.put("lore", item.getItemMeta().getLore());
+
+                    // Handle special items
+                    if (item.getType() == Material.ENCHANTED_BOOK) {
+                        EnchantmentStorageMeta enchantMeta = (EnchantmentStorageMeta) meta;
+                        Map<String, Integer> enchants = new HashMap<>();
+                        for (Map.Entry<Enchantment, Integer> ench : enchantMeta.getStoredEnchants().entrySet()) {
+                            enchants.put(ench.getKey().getKey().toString(), ench.getValue());
+                        }
+                        itemData.put("enchantments", enchants);
+                    }
+                    // Handle shulker boxes
+                    else if (meta instanceof BlockStateMeta blockMeta &&
+                            blockMeta.getBlockState() instanceof ShulkerBox shulkerBox) {
+                        Map<String, Object> contents = new HashMap<>();
+                        ItemStack[] shulkerContents = shulkerBox.getInventory().getContents();
+                        for (int slot = 0; slot < shulkerContents.length; slot++) {
+                            if (shulkerContents[slot] != null) {
+                                contents.put(String.valueOf(slot), shulkerContents[slot].serialize());
+                            }
+                        }
+                        itemData.put("shulker_contents", contents);
                     }
                 }
 
@@ -178,6 +149,9 @@ public class ChestShopPlugin extends JavaPlugin {
             getLogger().severe("Could not save data to " + file + ": " + e.getMessage());
             e.printStackTrace();
         }
+    }
+    public void saveShopData() {
+        saveData();
     }
 
     private void loadData() {
@@ -215,102 +189,55 @@ public class ChestShopPlugin extends JavaPlugin {
                     shop.setAdminShop(dataSection.getBoolean("isAdminShop", false));
                     shop.setPending(dataSection.getBoolean("isPending", false));
 
+                    // Load item
                     ConfigurationSection itemSection = dataSection.getConfigurationSection("item");
                     if (itemSection != null) {
                         Material type = Material.valueOf(itemSection.getString("type"));
                         int amount = itemSection.getInt("amount", 1);
                         ItemStack item = new ItemStack(type, amount);
+                        ItemMeta meta = item.getItemMeta();
+
+                        // Load display name
+                        if (itemSection.contains("display_name")) {
+                            meta.setDisplayName(itemSection.getString("display_name"));
+                        }
+
+                        // Load lore
+                        if (itemSection.contains("lore")) {
+                            meta.setLore(itemSection.getStringList("lore"));
+                        }
 
                         // Handle special items
-                        if (type != null) {
-                            ItemMeta meta = item.getItemMeta();
-
-                            // Handle display name and lore
-                            if (itemSection.contains("display_name")) {
-                                meta.setDisplayName(itemSection.getString("display_name"));
-                            }
-                            if (itemSection.contains("lore")) {
-                                meta.setLore(itemSection.getStringList("lore"));
-                            }
-
-                            switch (type) {
-                                case ENCHANTED_BOOK:
-                                    if (meta instanceof EnchantmentStorageMeta enchantMeta) {
-                                        ConfigurationSection enchants = itemSection.getConfigurationSection("enchantments");
-                                        if (enchants != null) {
-                                            for (String enchantKey : enchants.getKeys(false)) {
-                                                NamespacedKey namespacedKey = NamespacedKey.fromString(enchantKey);
-                                                if (namespacedKey != null) {
-                                                    Enchantment enchantment = Enchantment.getByKey(namespacedKey);
-                                                    if (enchantment != null) {
-                                                        enchantMeta.addStoredEnchant(enchantment,
-                                                                enchants.getInt(enchantKey), true);
-                                                    }
-                                                }
-                                            }
+                        if (type == Material.ENCHANTED_BOOK && meta instanceof EnchantmentStorageMeta enchantMeta) {
+                            ConfigurationSection enchants = itemSection.getConfigurationSection("enchantments");
+                            if (enchants != null) {
+                                for (String enchantKey : enchants.getKeys(false)) {
+                                    NamespacedKey namespacedKey = NamespacedKey.fromString(enchantKey);
+                                    if (namespacedKey != null) {
+                                        Enchantment enchantment = Enchantment.getByKey(namespacedKey);
+                                        if (enchantment != null) {
+                                            enchantMeta.addStoredEnchant(enchantment,
+                                                    enchants.getInt(enchantKey), true);
                                         }
                                     }
-                                    break;
-
-                                case SHULKER_BOX:
-                                case BLACK_SHULKER_BOX:
-                                case BLUE_SHULKER_BOX:
-                                case BROWN_SHULKER_BOX:
-                                case CYAN_SHULKER_BOX:
-                                case GRAY_SHULKER_BOX:
-                                case GREEN_SHULKER_BOX:
-                                case LIGHT_BLUE_SHULKER_BOX:
-                                case LIGHT_GRAY_SHULKER_BOX:
-                                case LIME_SHULKER_BOX:
-                                case MAGENTA_SHULKER_BOX:
-                                case ORANGE_SHULKER_BOX:
-                                case PINK_SHULKER_BOX:
-                                case PURPLE_SHULKER_BOX:
-                                case RED_SHULKER_BOX:
-                                case WHITE_SHULKER_BOX:
-                                case YELLOW_SHULKER_BOX:
-                                    if (meta instanceof BlockStateMeta blockMeta) {
-                                        if (blockMeta.getBlockState() instanceof ShulkerBox shulker) {
-                                            ConfigurationSection contents =
-                                                    itemSection.getConfigurationSection("shulker_contents");
-                                            if (contents != null) {
-                                                for (String slot : contents.getKeys(false)) {
-                                                    ItemStack contentItem = contents.getItemStack(slot);
-                                                    if (contentItem != null) {
-                                                        shulker.getInventory().setItem(
-                                                                Integer.parseInt(slot), contentItem);
-                                                    }
-                                                }
-                                            }
-                                            blockMeta.setBlockState(shulker);
-                                        }
-                                    }
-                                    break;
-
-                                case AXOLOTL_BUCKET:
-                                case PUFFERFISH_BUCKET:
-                                case SALMON_BUCKET:
-                                case COD_BUCKET:
-                                case TROPICAL_FISH_BUCKET:
-                                case TADPOLE_BUCKET:
-                                    if (meta != null && itemSection.contains("bucket_data")) {
-                                        PersistentDataContainer container = meta.getPersistentDataContainer();
-                                        ConfigurationSection bucketData = itemSection.getConfigurationSection("bucket_data");
-                                        if (bucketData != null) {
-                                            for (String dataKey : bucketData.getKeys(false)) {
-                                                NamespacedKey nbtKey = NamespacedKey.fromString(dataKey);
-                                                if (nbtKey != null) {
-                                                    String value = bucketData.getString(dataKey);
-                                                    if (value != null) {
-                                                        container.set(nbtKey, PersistentDataType.STRING, value);
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                    break;
+                                }
                             }
-
+                            item.setItemMeta(enchantMeta);
+                        }
+                        // Handle shulker boxes
+                        else if (meta instanceof BlockStateMeta blockMeta &&
+                                blockMeta.getBlockState() instanceof ShulkerBox shulkerBox) {
+                            ConfigurationSection contents = itemSection.getConfigurationSection("shulker_contents");
+                            if (contents != null) {
+                                for (String slot : contents.getKeys(false)) {
+                                    Map<String, Object> itemMap = contents.getConfigurationSection(slot).getValues(true);
+                                    ItemStack contentItem = ItemStack.deserialize(itemMap);
+                                    shulkerBox.getInventory().setItem(Integer.parseInt(slot), contentItem);
+                                }
+                                blockMeta.setBlockState(shulkerBox);
+                                item.setItemMeta(blockMeta);
+                            }
+                        } else {
                             item.setItemMeta(meta);
                         }
 
@@ -327,7 +254,6 @@ public class ChestShopPlugin extends JavaPlugin {
             }
         }
     }
-
 
     @Override
     public void onEnable() {

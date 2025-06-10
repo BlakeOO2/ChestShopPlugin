@@ -200,14 +200,24 @@ public class ChestShopCommand implements CommandExecutor, TabCompleter {
 
         // Set the new owner
         String newOwner = args[1];
+
+        // Update the shop object
         shop.setOwnerName(newOwner);
+
+        // Update the sign
         sign.setLine(0, newOwner);
         sign.update();
+
+        // Save the updated shop to the plugin's data
         plugin.addShop(targetBlock.getLocation(), shop);
+
+        // Force a data save
+        plugin.saveShopData(); // We'll need to add this method to ChestShopPlugin
 
         player.sendMessage("§aShop owner has been set to: " + newOwner);
         return true;
     }
+
 
     private boolean handleChangeCommand(CommandSender sender, String[] args) {
         if (!(sender instanceof Player player)) {
