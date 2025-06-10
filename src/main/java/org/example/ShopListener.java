@@ -254,7 +254,7 @@ public class ShopListener implements Listener {
         }
     }
     private void handleBuying(Player player, ChestShop shop) {
-        if (shop.getBuyPrice() <= 0) {
+        if (shop.getBuyPrice() < 0) {
             player.sendMessage("§cThis shop is not selling items!");
             return;
         }
@@ -273,8 +273,8 @@ public class ShopListener implements Listener {
             return;
         }
 
-        // Check if player has enough money
-        if (!economy.has(player, price)) {
+        // Check if player has enough money (skip if free)
+        if (price > 0 && !economy.has(player, price)) {
             player.sendMessage("§cYou don't have enough money! You need: $" + price);
             return;
         }
@@ -294,9 +294,11 @@ public class ShopListener implements Listener {
         }
 
         // Process transaction ONLY after all checks have passed
-        economy.withdrawPlayer(player, price);
-        if (!shop.isAdminShop()) {
-            economy.depositPlayer(Bukkit.getOfflinePlayer(shop.getOwnerName()), price);
+        if (price > 0) {
+            economy.withdrawPlayer(player, price);
+            if (!shop.isAdminShop()) {
+                economy.depositPlayer(Bukkit.getOfflinePlayer(shop.getOwnerName()), price);
+            }
         }
 
         // Remove items from container
@@ -307,8 +309,10 @@ public class ShopListener implements Listener {
 
         // Extra safety check - if somehow items couldn't be added, refund and return items
         if (!leftover.isEmpty()) {
-            // Refund the player
-            economy.depositPlayer(player, price);
+            // Refund the player if they paid
+            if (price > 0) {
+                economy.depositPlayer(player, price);
+            }
             // Return items to container if not admin shop
             if (!shop.isAdminShop()) {
                 addItemsToContainer(container, shop.getItem(), quantity);
@@ -318,28 +322,30 @@ public class ShopListener implements Listener {
         }
 
         // Success message
-        player.sendMessage(String.format("§aSuccessfully bought %dx %s for $%.2f",
+        String priceText = price > 0 ? String.format(" for $%.2f", price) : " for FREE";
+        player.sendMessage(String.format("§aSuccessfully bought %dx %s%s",
                 quantity,
                 shop.getItem().getType().name().toLowerCase().replace("_", " "),
-                price));
+                priceText));
 
         // Notify shop owner if they're online
         if (!shop.isAdminShop()) {
             Player owner = Bukkit.getPlayer(shop.getOwnerName());
             if (owner != null && owner.isOnline()) {
-                plugin.getNotificationManager().sendNotification(owner, String.format(
-                        "§a%s bought %dx %s from your shop for $%.2f",
+                String notification = String.format(
+                        "§a%s bought %dx %s%s",
                         player.getName(),
                         quantity,
                         shop.getItem().getType().name().toLowerCase().replace("_", " "),
-                        price
-                ));
+                        priceText
+                );
+                plugin.getNotificationManager().sendNotification(owner, notification);
             }
         }
     }
 
     private void handleSelling(Player player, ChestShop shop) {
-        if (shop.getSellPrice() <= 0) {
+        if (shop.getSellPrice() < 0) {
             player.sendMessage("§cThis shop is not buying items!");
             return;
         }
@@ -354,16 +360,15 @@ public class ShopListener implements Listener {
             return;
         }
 
-        // Check if shop owner has enough money
-        if (!shop.isAdminShop()) {
-            // Check if shop owner has enough money
+        // Check if shop owner has enough money (skip if free)
+        if (price > 0 && !shop.isAdminShop()) {
             if (!economy.has(Bukkit.getOfflinePlayer(shop.getOwnerName()), price)) {
                 player.sendMessage("§cShop owner doesn't have enough money!");
                 return;
             }
         }
 
-        // Get the attached chest
+        // Get the attached container
         Block signBlock = shop.getLocation().getBlock();
         Container container = getAttachedContainer(signBlock);
         if (container == null) {
@@ -378,31 +383,39 @@ public class ShopListener implements Listener {
         }
 
         // Process transaction
-        if (!shop.isAdminShop()) {
-            economy.withdrawPlayer(Bukkit.getOfflinePlayer(shop.getOwnerName()), price);
+        if (price > 0) {
+            if (!shop.isAdminShop()) {
+                economy.withdrawPlayer(Bukkit.getOfflinePlayer(shop.getOwnerName()), price);
+            }
+            economy.depositPlayer(player, price);
         }
-        economy.depositPlayer(player, price);
 
+        // Remove items from player
         removeItemsFromPlayer(player, shop.getItem(), quantity);
+
+        // Add items to container
         addItemsToContainer(container, shop.getItem(), quantity);
 
+        // Get proper item name
         String itemName = shop.getItem().hasItemMeta() && shop.getItem().getItemMeta().hasDisplayName()
                 ? shop.getItem().getItemMeta().getDisplayName()
                 : shop.getItem().getType().name().toLowerCase().replace("_", " ");
 
-        player.sendMessage(String.format("§aSuccessfully sold %dx %s for $%.2f",
-                quantity, itemName, price));
+        // Success message with price text
+        String priceText = price > 0 ? String.format(" for $%.2f", price) : " for FREE";
+        player.sendMessage(String.format("§aSuccessfully sold %dx %s%s",
+                quantity, itemName, priceText));
 
         // Notify shop owner if they're online and notifications are enabled
         if (!shop.isAdminShop()) {
             Player owner = Bukkit.getPlayer(shop.getOwnerName());
             if (owner != null && owner.isOnline()) {
                 String notification = String.format(
-                        "§a%s sold %dx %s to your shop for $%.2f",
+                        "§a%s sold %dx %s%s",
                         player.getName(),
                         quantity,
                         itemName,
-                        price
+                        priceText
                 );
                 plugin.getNotificationManager().sendNotification(owner, notification);
             }

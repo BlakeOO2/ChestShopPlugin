@@ -29,28 +29,44 @@ public class ShopSignHandler {
         }
 
         try {
-            // Format: BX:SX or B$X:S$X or BX or B$X or SX or S$X
+            // Format: BX:SX or B$X:S$X or BX or B$X or SX or S$X or BFREE:SX or BX:SFREE or BFREE or SFREE
             if (priceLine.contains(":")) {
                 // Both buy and sell prices
                 String[] parts = priceLine.split(":");
                 if (parts[0].startsWith("B")) {
-                    // Remove B and optional $
+                    // Handle buy price
                     String priceStr = parts[0].substring(1).replace("$", "");
-                    buyPrice = Double.parseDouble(priceStr);
+                    if (priceStr.equalsIgnoreCase("FREE")) {
+                        buyPrice = 0;
+                    } else {
+                        buyPrice = Double.parseDouble(priceStr);
+                    }
                 }
                 if (parts[1].startsWith("S")) {
-                    // Remove S and optional $
+                    // Handle sell price
                     String priceStr = parts[1].substring(1).replace("$", "");
-                    sellPrice = Double.parseDouble(priceStr);
+                    if (priceStr.equalsIgnoreCase("FREE")) {
+                        sellPrice = 0;
+                    } else {
+                        sellPrice = Double.parseDouble(priceStr);
+                    }
                 }
             } else if (priceLine.startsWith("B")) {
-                // Buy only - Remove B and optional $
+                // Buy only
                 String priceStr = priceLine.substring(1).replace("$", "");
-                buyPrice = Double.parseDouble(priceStr);
+                if (priceStr.equalsIgnoreCase("FREE")) {
+                    buyPrice = 0;
+                } else {
+                    buyPrice = Double.parseDouble(priceStr);
+                }
             } else if (priceLine.startsWith("S")) {
-                // Sell only - Remove S and optional $
+                // Sell only
                 String priceStr = priceLine.substring(1).replace("$", "");
-                sellPrice = Double.parseDouble(priceStr);
+                if (priceStr.equalsIgnoreCase("FREE")) {
+                    sellPrice = 0;
+                } else {
+                    sellPrice = Double.parseDouble(priceStr);
+                }
             }
         } catch (NumberFormatException e) {
             return new PriceInfo(-1, -1);
@@ -58,6 +74,7 @@ public class ShopSignHandler {
 
         return new PriceInfo(buyPrice, sellPrice);
     }
+
 
     public void updateSignText(Sign sign, ItemStack item, double buyPrice, double sellPrice) {
         if (!(sign instanceof org.bukkit.block.Sign)) return;

@@ -279,6 +279,12 @@ public class ChestShopCommand implements CommandExecutor, TabCompleter {
     }
 
     private boolean validatePriceLine(String text) {
+        // First check if it's a valid format
+        if (!text.matches("^B(?:FREE|\\d+(?:\\.\\d+)?)?(?::S(?:FREE|\\d+(?:\\.\\d+)?)?)?$") &&
+                !text.matches("^S(?:FREE|\\d+(?:\\.\\d+)?)?(?::B(?:FREE|\\d+(?:\\.\\d+)?)?)?$")) {
+            return false;
+        }
+
         return plugin.getSignHandler().parsePriceLine(text).isValid();
     }
 
@@ -345,4 +351,4 @@ public class ChestShopCommand implements CommandExecutor, TabCompleter {
         return new ArrayList<>();
     }
 }
-}
+
