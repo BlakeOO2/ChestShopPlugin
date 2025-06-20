@@ -207,6 +207,7 @@ public class ShopListener implements Listener {
 
 
 
+
     @EventHandler(priority = EventPriority.HIGH)
     public void onSignInteract(PlayerInteractEvent event) {
         if (event.getClickedBlock() == null || !(event.getClickedBlock().getState() instanceof Sign)) {
@@ -221,6 +222,20 @@ public class ShopListener implements Listener {
         }
 
         Player player = event.getPlayer();
+
+        // Check if shop is broken (has no item but is not pending)
+        if (shop.getItem() == null && !shop.isPending()) {
+            // Auto-repair the shop
+            plugin.repairShop(block.getLocation());
+            player.sendMessage("§cThis shop appears to be broken and has been marked for repair.");
+
+            // If player is the owner, tell them how to fix it
+            if (shop.getOwnerName().equals(player.getName())) {
+                player.sendMessage("§eRight-click the sign with the item you want to sell to fix your shop.");
+            }
+            event.setCancelled(true);
+            return;
+        }
 
         // Handle pending shop item selection
         if (shop.isPending() && shop.getOwnerName().equals(player.getName())) {
@@ -254,6 +269,13 @@ public class ShopListener implements Listener {
         }
     }
     private void handleBuying(Player player, ChestShop shop) {
+        // Check if the shop has a valid item
+        if (shop.getItem() == null) {
+            player.sendMessage("§cThis shop has no item set! Please contact the shop owner.");
+            plugin.getLogger().warning("Shop at " + shop.getLocation() + " owned by " + shop.getOwnerName() + " has no item set!");
+            return;
+        }
+
         if (shop.getBuyPrice() < 0) {
             player.sendMessage("§cThis shop is not selling items!");
             return;
@@ -301,11 +323,23 @@ public class ShopListener implements Listener {
             }
         }
 
-        // Remove items from container
-        removeItemsFromContainer(container, shop.getItem(), quantity);
+        // For non-admin shops, remove items from container
+        if (!shop.isAdminShop()) {
+            removeItemsFromContainer(container, shop.getItem(), quantity);
+        }
 
         // Give items to player - This should never fail now because we checked space
-        HashMap<Integer, ItemStack> leftover = player.getInventory().addItem(itemToGive);
+        HashMap<Integer, ItemStack> leftover;
+
+        // Special handling for bucket items
+        if (shop.getItem().getType().name().endsWith("_BUCKET") && !shop.getItem().getType().equals(Material.BUCKET)) {
+            // For bucket items, create fresh items of the correct type
+            ItemStack bucketItem = new ItemStack(shop.getItem().getType(), quantity);
+            leftover = player.getInventory().addItem(bucketItem);
+        } else {
+            // For regular items, use the cloned item
+            leftover = player.getInventory().addItem(itemToGive);
+        }
 
         // Extra safety check - if somehow items couldn't be added, refund and return items
         if (!leftover.isEmpty()) {
@@ -439,6 +473,18 @@ public class ShopListener implements Listener {
 
 
     private boolean hasEnoughItems(Player player, ItemStack item, int quantity) {
+        // Special handling for buckets - only check the material type, not the specific entity data
+        if (item.getType().name().endsWith("_BUCKET") && !item.getType().equals(Material.BUCKET)) {
+            int count = 0;
+            for (ItemStack stack : player.getInventory().getContents()) {
+                if (stack != null && stack.getType() == item.getType()) {
+                    count += stack.getAmount();
+                }
+            }
+            return count >= quantity;
+        }
+
+        // Normal item comparison for non-bucket items
         int count = 0;
         for (ItemStack stack : player.getInventory().getContents()) {
             if (stack != null && stack.isSimilar(item)) {
@@ -447,6 +493,7 @@ public class ShopListener implements Listener {
         }
         return count >= quantity;
     }
+
 
     private boolean hasEnoughItems(Container container, ItemStack item, int quantity, ChestShop shop) {
         if (shop.isAdminShop()) {
@@ -503,9 +550,19 @@ public class ShopListener implements Listener {
         int remaining = amount;
         ItemStack[] contents = player.getInventory().getContents();
 
+        // Special handling for buckets
+        boolean isBucket = itemToRemove.getType().name().endsWith("_BUCKET") &&
+                !itemToRemove.getType().equals(Material.BUCKET);
+
         for (int i = 0; i < contents.length && remaining > 0; i++) {
             ItemStack item = contents[i];
-            if (item != null && item.isSimilar(itemToRemove)) {
+            if (item == null) continue;
+
+            boolean matches = isBucket ?
+                    (item.getType() == itemToRemove.getType()) :
+                    item.isSimilar(itemToRemove);
+
+            if (matches) {
                 if (item.getAmount() <= remaining) {
                     remaining -= item.getAmount();
                     player.getInventory().setItem(i, null);
