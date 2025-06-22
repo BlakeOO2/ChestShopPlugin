@@ -332,13 +332,15 @@ public class ShopListener implements Listener {
         HashMap<Integer, ItemStack> leftover;
 
         // Special handling for bucket items
-        if (shop.getItem().getType().name().endsWith("_BUCKET") && !shop.getItem().getType().equals(Material.BUCKET)) {
+        if (isSpecialBucket(shop.getItem().getType())) {
             // For bucket items, create fresh items of the correct type
             ItemStack bucketItem = new ItemStack(shop.getItem().getType(), quantity);
             leftover = player.getInventory().addItem(bucketItem);
         } else {
             // For regular items, use the cloned item
-            leftover = player.getInventory().addItem(itemToGive);
+            ItemStack itemToGivetwo = shop.getItem().clone();
+            itemToGivetwo.setAmount(quantity);
+            leftover = player.getInventory().addItem(itemToGivetwo);
         }
 
         // Extra safety check - if somehow items couldn't be added, refund and return items
@@ -458,14 +460,26 @@ public class ShopListener implements Listener {
 
     private boolean hasEnoughSpaceInContainer(Container container, ItemStack item, int quantity, ChestShop shop) {
         if (shop.isAdminShop()) {
-            return true; // Admin shops have unlimited space
+            return true;
         }
+
+        Material itemType = item.getType();
+        boolean isSpecialBucket = isSpecialBucket(itemType);
+
         int freeSpace = 0;
         for (ItemStack stack : container.getInventory().getContents()) {
             if (stack == null) {
                 freeSpace += item.getMaxStackSize();
-            } else if (stack.isSimilar(item)) {
-                freeSpace += item.getMaxStackSize() - stack.getAmount();
+            } else if (isSpecialBucket) {
+                // For buckets, only check material type
+                if (stack.getType() == itemType) {
+                    freeSpace += item.getMaxStackSize() - stack.getAmount();
+                }
+            } else {
+                // For other items, use normal comparison
+                if (stack.isSimilar(item)) {
+                    freeSpace += item.getMaxStackSize() - stack.getAmount();
+                }
             }
         }
         return freeSpace >= quantity;
@@ -473,22 +487,23 @@ public class ShopListener implements Listener {
 
 
     private boolean hasEnoughItems(Player player, ItemStack item, int quantity) {
-        // Special handling for buckets - only check the material type, not the specific entity data
-        if (item.getType().name().endsWith("_BUCKET") && !item.getType().equals(Material.BUCKET)) {
-            int count = 0;
-            for (ItemStack stack : player.getInventory().getContents()) {
-                if (stack != null && stack.getType() == item.getType()) {
-                    count += stack.getAmount();
-                }
-            }
-            return count >= quantity;
-        }
+        Material itemType = item.getType();
+        boolean isSpecialBucket = isSpecialBucket(itemType);
 
-        // Normal item comparison for non-bucket items
         int count = 0;
         for (ItemStack stack : player.getInventory().getContents()) {
-            if (stack != null && stack.isSimilar(item)) {
-                count += stack.getAmount();
+            if (stack != null) {
+                if (isSpecialBucket) {
+                    // For buckets, only check material type
+                    if (stack.getType() == itemType) {
+                        count += stack.getAmount();
+                    }
+                } else {
+                    // For other items, use normal comparison
+                    if (stack.isSimilar(item)) {
+                        count += stack.getAmount();
+                    }
+                }
             }
         }
         return count >= quantity;
@@ -499,10 +514,24 @@ public class ShopListener implements Listener {
         if (shop.isAdminShop()) {
             return true;
         }
+
+        Material itemType = item.getType();
+        boolean isSpecialBucket = isSpecialBucket(itemType);
+
         int count = 0;
         for (ItemStack stack : container.getInventory().getContents()) {
-            if (stack != null && stack.isSimilar(item)) {
-                count += stack.getAmount();
+            if (stack != null) {
+                if (isSpecialBucket) {
+                    // For buckets, only check material type
+                    if (stack.getType() == itemType) {
+                        count += stack.getAmount();
+                    }
+                } else {
+                    // For other items, use normal comparison
+                    if (stack.isSimilar(item)) {
+                        count += stack.getAmount();
+                    }
+                }
             }
         }
         return count >= quantity;
@@ -550,17 +579,21 @@ public class ShopListener implements Listener {
         int remaining = amount;
         ItemStack[] contents = player.getInventory().getContents();
 
-        // Special handling for buckets
-        boolean isBucket = itemToRemove.getType().name().endsWith("_BUCKET") &&
-                !itemToRemove.getType().equals(Material.BUCKET);
+        Material itemType = itemToRemove.getType();
+        boolean isSpecialBucket = isSpecialBucket(itemType);
 
         for (int i = 0; i < contents.length && remaining > 0; i++) {
             ItemStack item = contents[i];
             if (item == null) continue;
 
-            boolean matches = isBucket ?
-                    (item.getType() == itemToRemove.getType()) :
-                    item.isSimilar(itemToRemove);
+            boolean matches;
+            if (isSpecialBucket) {
+                // For buckets, only check material type
+                matches = (item.getType() == itemType);
+            } else {
+                // For other items, use normal comparison
+                matches = item.isSimilar(itemToRemove);
+            }
 
             if (matches) {
                 if (item.getAmount() <= remaining) {
@@ -575,13 +608,28 @@ public class ShopListener implements Listener {
         player.updateInventory();
     }
 
+
     private void removeItemsFromContainer(Container container, ItemStack itemToRemove, int amount) {
         int remaining = amount;
         ItemStack[] contents = container.getInventory().getContents();
 
+        Material itemType = itemToRemove.getType();
+        boolean isSpecialBucket = isSpecialBucket(itemType);
+
         for (int i = 0; i < contents.length && remaining > 0; i++) {
             ItemStack item = contents[i];
-            if (item != null && item.isSimilar(itemToRemove)) {
+            if (item == null) continue;
+
+            boolean matches;
+            if (isSpecialBucket) {
+                // For buckets, only check material type
+                matches = (item.getType() == itemType);
+            } else {
+                // For other items, use normal comparison
+                matches = item.isSimilar(itemToRemove);
+            }
+
+            if (matches) {
                 if (item.getAmount() <= remaining) {
                     remaining -= item.getAmount();
                     container.getInventory().setItem(i, null);
@@ -591,6 +639,10 @@ public class ShopListener implements Listener {
                 }
             }
         }
+    }
+
+    private boolean isSpecialBucket(Material material) {
+        return material.name().endsWith("_BUCKET") && !material.equals(Material.BUCKET);
     }
 
     private void addItemsToContainer(Container container, ItemStack item, int amount) {
