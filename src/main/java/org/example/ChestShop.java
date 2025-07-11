@@ -88,10 +88,17 @@ public class ChestShop {
         data.put("isAdminShop", isAdminShop);
         data.put("isPending", isPending);
 
-        // Special handling for enchanted books
+        // Special handling for items that need special serialization
         if (item != null) {
             Map<String, Object> itemData = item.serialize();
-            // Store meta data separately for enchanted books
+
+            // Store full serialized form for special items to preserve all data
+            if (isSpecialItem(item.getType())) {
+                // Save the complete serialized form for these special items
+                itemData.put("full_serialized", item.serialize());
+            }
+
+            // Additional specific handling for enchanted books
             if (item.getType() == Material.ENCHANTED_BOOK && item.hasItemMeta()) {
                 EnchantmentStorageMeta meta = (EnchantmentStorageMeta) item.getItemMeta();
                 Map<String, Integer> enchants = new HashMap<>();
@@ -100,6 +107,7 @@ public class ChestShop {
                 }
                 itemData.put("stored-enchants", enchants);
             }
+
             data.put("item", itemData);
         }
 
@@ -134,24 +142,40 @@ public class ChestShop {
             if (data.containsKey("item")) {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> itemData = (Map<String, Object>) data.get("item");
-                ItemStack item = ItemStack.deserialize(itemData);
+                ItemStack item = null;
 
-                // Handle enchanted books
-                if (item.getType() == Material.ENCHANTED_BOOK && itemData.containsKey("stored-enchants")) {
-                    EnchantmentStorageMeta meta = (EnchantmentStorageMeta) item.getItemMeta();
-                    @SuppressWarnings("unchecked")
-                    Map<String, Integer> enchants = (Map<String, Integer>) itemData.get("stored-enchants");
+                // Try to load from full serialized form first (for special items)
+                if (itemData.containsKey("full_serialized")) {
+                    try {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> fullSerialized = (Map<String, Object>) itemData.get("full_serialized");
+                        item = ItemStack.deserialize(fullSerialized);
+                    } catch (Exception e) {
+                        // If loading from full serialization fails, we'll fall back to normal deserialization
+                    }
+                }
 
-                    for (Map.Entry<String, Integer> entry : enchants.entrySet()) {
-                        NamespacedKey key = NamespacedKey.fromString(entry.getKey());
-                        if (key != null) {
-                            Enchantment ench = Enchantment.getByKey(key);
-                            if (ench != null) {
-                                meta.addStoredEnchant(ench, entry.getValue(), true);
+                // If item is still null, load using standard deserialization
+                if (item == null) {
+                    item = ItemStack.deserialize(itemData);
+
+                    // Handle enchanted books specially if needed
+                    if (item.getType() == Material.ENCHANTED_BOOK && itemData.containsKey("stored-enchants")) {
+                        EnchantmentStorageMeta meta = (EnchantmentStorageMeta) item.getItemMeta();
+                        @SuppressWarnings("unchecked")
+                        Map<String, Integer> enchants = (Map<String, Integer>) itemData.get("stored-enchants");
+
+                        for (Map.Entry<String, Integer> entry : enchants.entrySet()) {
+                            NamespacedKey key = NamespacedKey.fromString(entry.getKey());
+                            if (key != null) {
+                                Enchantment ench = Enchantment.getByKey(key);
+                                if (ench != null) {
+                                    meta.addStoredEnchant(ench, entry.getValue(), true);
+                                }
                             }
                         }
+                        item.setItemMeta(meta);
                     }
-                    item.setItemMeta(meta);
                 }
 
                 shop.setItem(item);
@@ -174,5 +198,17 @@ public class ChestShop {
     public void setAdminShop(boolean adminShop) { isAdminShop = adminShop; }
     public static void setAdminShopDisplayName(String name) { adminShopDisplayName = name; }
     public static String getAdminShopDisplayName() { return adminShopDisplayName; }
+
+    /**
+     * Determines if an item type needs special serialization handling
+     * @param material The material to check
+     * @return True if the material needs special handling
+     */
+    private boolean isSpecialItem(Material material) {
+        return material == Material.WRITTEN_BOOK || 
+               material == Material.FILLED_MAP || 
+               material == Material.ENCHANTED_BOOK || 
+               (material.name().endsWith("_BUCKET") && !material.equals(Material.BUCKET));
+    }
 
 }

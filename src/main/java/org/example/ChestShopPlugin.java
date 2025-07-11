@@ -125,6 +125,11 @@ public class ChestShopPlugin extends JavaPlugin {
                         }
                         itemData.put("enchantments", enchants);
                     }
+                    // Special handling for written books and maps
+                    else if (item.getType() == Material.WRITTEN_BOOK || item.getType() == Material.FILLED_MAP) {
+                        // For written books and maps, we'll save the full serialized form
+                        itemData.put("full_serialized", item.serialize());
+                    }
                     // Handle shulker boxes
                     else if (isShulkerBox(item.getType())) {
                         try {
@@ -323,6 +328,20 @@ public class ChestShopPlugin extends JavaPlugin {
                                         }
                                     }
                                     item.setItemMeta(enchantMeta);
+                                }
+                                // Handle written books and maps
+                                else if (type == Material.WRITTEN_BOOK || type == Material.FILLED_MAP) {
+                                    // Try to use the full serialized form if available
+                                    if (itemSection.contains("full_serialized")) {
+                                        try {
+                                            ConfigurationSection fullSerialized = itemSection.getConfigurationSection("full_serialized");
+                                            if (fullSerialized != null) {
+                                                item = ItemStack.deserialize(fullSerialized.getValues(true));
+                                            }
+                                        } catch (Exception e) {
+                                            getLogger().warning("Failed to load special item (" + type + ") from full serialization: " + e.getMessage());
+                                        }
+                                    }
                                 }
                                 // Handle shulker boxes
                                 else if (isShulkerBox(type) && meta instanceof BlockStateMeta blockMeta) {

@@ -315,11 +315,11 @@ public class ShopListener implements Listener {
 
         // Determine what item to give to the player
         ItemStack itemToGive;
-        if (!shop.isAdminShop() && isSpecialBucket(shop.getItem().getType())) {
-            // For buckets in non-admin shops, find the actual item in the container
-            itemToGive = findMatchingBucketInContainer(container, shop.getItem().getType(), quantity);
+        if (!shop.isAdminShop() && isSpecialItem(shop.getItem().getType())) {
+            // For special items in non-admin shops, find the actual item in the container
+            itemToGive = findMatchingSpecialItemInContainer(container, shop.getItem().getType(), quantity);
             if (itemToGive == null) {
-                // Fallback to a new item if no matching bucket found
+                // Fallback to a new item if no matching special item found
                 itemToGive = new ItemStack(shop.getItem().getType(), quantity);
             }
         } else {
@@ -437,18 +437,18 @@ public class ShopListener implements Listener {
         }
 
         // Handle item transfer
-        if (isSpecialBucket(shop.getItem().getType())) {
-            // For bucket items, find the actual item in player inventory
-            ItemStack actualBucket = findFirstBucketInInventory(player, shop.getItem().getType());
-            if (actualBucket != null) {
-                // Remove the specific bucket items from player
-                removeSpecificBucketsFromPlayer(player, actualBucket.getType(), quantity);
+        if (isSpecialItem(shop.getItem().getType())) {
+            // For special items, find the actual item in player inventory
+            ItemStack actualItem = findFirstSpecialItemInInventory(player, shop.getItem().getType());
+            if (actualItem != null) {
+                // Remove the specific items from player
+                removeSpecificItemsFromPlayer(player, actualItem.getType(), quantity);
 
-                // Add the specific bucket to container (if not admin shop)
+                // Add the specific item to container (if not admin shop)
                 if (!shop.isAdminShop()) {
-                    ItemStack bucketToAdd = actualBucket.clone();
-                    bucketToAdd.setAmount(quantity);
-                    container.getInventory().addItem(bucketToAdd);
+                    ItemStack itemToAdd = actualItem.clone();
+                    itemToAdd.setAmount(quantity);
+                    container.getInventory().addItem(itemToAdd);
                 }
             } else {
                 // Fallback to standard removal
@@ -493,9 +493,9 @@ public class ShopListener implements Listener {
 
 
 
-    private ItemStack findMatchingBucketInContainer(Container container, Material bucketType, int quantity) {
+    private ItemStack findMatchingSpecialItemInContainer(Container container, Material specialType, int quantity) {
         for (ItemStack item : container.getInventory().getContents()) {
-            if (item != null && item.getType() == bucketType) {
+            if (item != null && item.getType() == specialType) {
                 ItemStack result = item.clone();
                 result.setAmount(quantity);
                 return result;
@@ -504,22 +504,22 @@ public class ShopListener implements Listener {
         return null;
     }
 
-    private ItemStack findFirstBucketInInventory(Player player, Material bucketType) {
+    private ItemStack findFirstSpecialItemInInventory(Player player, Material specialType) {
         for (ItemStack item : player.getInventory().getContents()) {
-            if (item != null && item.getType() == bucketType) {
+            if (item != null && item.getType() == specialType) {
                 return item.clone();
             }
         }
         return null;
     }
 
-    private void removeSpecificBucketsFromPlayer(Player player, Material bucketType, int amount) {
+    private void removeSpecificItemsFromPlayer(Player player, Material itemType, int amount) {
         int remaining = amount;
         ItemStack[] contents = player.getInventory().getContents();
 
         for (int i = 0; i < contents.length && remaining > 0; i++) {
             ItemStack item = contents[i];
-            if (item != null && item.getType() == bucketType) {
+            if (item != null && item.getType() == itemType) {
                 if (item.getAmount() <= remaining) {
                     remaining -= item.getAmount();
                     player.getInventory().setItem(i, null);
@@ -538,14 +538,14 @@ public class ShopListener implements Listener {
         }
 
         Material itemType = item.getType();
-        boolean isSpecialBucket = isSpecialBucket(itemType);
+        boolean isSpecialItem = isSpecialItem(itemType);
 
         int freeSpace = 0;
         for (ItemStack stack : container.getInventory().getContents()) {
             if (stack == null) {
                 freeSpace += item.getMaxStackSize();
-            } else if (isSpecialBucket) {
-                // For buckets, only check material type
+            } else if (isSpecialItem) {
+                // For special items, only check material type
                 if (stack.getType() == itemType) {
                     freeSpace += item.getMaxStackSize() - stack.getAmount();
                 }
@@ -562,13 +562,13 @@ public class ShopListener implements Listener {
 
     private boolean hasEnoughItems(Player player, ItemStack item, int quantity) {
         Material itemType = item.getType();
-        boolean isSpecialBucket = isSpecialBucket(itemType);
+        boolean isSpecialItem = isSpecialItem(itemType);
 
         int count = 0;
         for (ItemStack stack : player.getInventory().getContents()) {
             if (stack != null) {
-                if (isSpecialBucket) {
-                    // For buckets, only check material type
+                if (isSpecialItem) {
+                    // For special items, only check material type
                     if (stack.getType() == itemType) {
                         count += stack.getAmount();
                     }
@@ -590,13 +590,13 @@ public class ShopListener implements Listener {
         }
 
         Material itemType = item.getType();
-        boolean isSpecialBucket = isSpecialBucket(itemType);
+        boolean isSpecialItem = isSpecialItem(itemType);
 
         int count = 0;
         for (ItemStack stack : container.getInventory().getContents()) {
             if (stack != null) {
-                if (isSpecialBucket) {
-                    // For buckets, only check material type
+                if (isSpecialItem) {
+                    // For special items, only check material type
                     if (stack.getType() == itemType) {
                         count += stack.getAmount();
                     }
@@ -654,15 +654,15 @@ public class ShopListener implements Listener {
         ItemStack[] contents = player.getInventory().getContents();
 
         Material itemType = itemToRemove.getType();
-        boolean isSpecialBucket = isSpecialBucket(itemType);
+        boolean isSpecialItem = isSpecialItem(itemType);
 
         for (int i = 0; i < contents.length && remaining > 0; i++) {
             ItemStack item = contents[i];
             if (item == null) continue;
 
             boolean matches;
-            if (isSpecialBucket) {
-                // For buckets, only check material type
+            if (isSpecialItem) {
+                // For special items, only check material type
                 matches = (item.getType() == itemType);
             } else {
                 // For other items, use normal comparison
@@ -687,15 +687,15 @@ public class ShopListener implements Listener {
         ItemStack[] contents = container.getInventory().getContents();
 
         Material itemType = itemToRemove.getType();
-        boolean isSpecialBucket = isSpecialBucket(itemType);
+        boolean isSpecialItem = isSpecialItem(itemType);
 
         for (int i = 0; i < contents.length && remaining > 0; i++) {
             ItemStack item = contents[i];
             if (item == null) continue;
 
             boolean matches;
-            if (isSpecialBucket) {
-                // For buckets, only check material type
+            if (isSpecialItem) {
+                // For special items, only check material type
                 matches = (item.getType() == itemType);
             } else {
                 // For other items, use normal comparison
@@ -718,6 +718,36 @@ public class ShopListener implements Listener {
     // Helper methods
     private boolean isSpecialBucket(Material material) {
         return material.name().endsWith("_BUCKET") && !material.equals(Material.BUCKET);
+    }
+
+    /**
+     * Determines if an item type needs special handling for shop operations
+     * @param material The material to check
+     * @return True if the material needs special handling
+     */
+    private boolean isSpecialItem(Material material) {
+        return material == Material.WRITTEN_BOOK || 
+               material == Material.FILLED_MAP || 
+               material == Material.ENCHANTED_BOOK ||
+                (material.name().endsWith("_BUCKET") && !material.equals(Material.BUCKET)) ||
+                (material.name().endsWith("_BOOTS")) ||
+                (material.name().endsWith("_LEGGINGS")) ||
+                (material.name().endsWith("_CHESTPLATE")) ||
+                (material.name().endsWith("_HELMET")) ||
+                (material.name().endsWith("_SHOVEL")) ||
+                (material.name().endsWith("_PICKAXE")) ||
+                (material.name().endsWith("_AXE")) ||
+                (material.name().endsWith("_HOE")) ||
+                material == Material.FISHING_ROD ||
+                (material.name().endsWith("_SWORD")) ||
+                (material.name().endsWith("_SHIELD")) ||
+                (material.name().endsWith("_ELYTRA")) ||
+                material == Material.TRIDENT ||
+                (material.name().endsWith("_HORSE_ARMOR")) ||
+                (material.name().endsWith("_CROSSBOW")) ||
+                (material.name().endsWith("_BOW")) ||
+                material == Material.MACE;
+
     }
 
     private void addItemsToContainer(Container container, ItemStack item, int amount) {
