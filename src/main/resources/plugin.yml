@@ -1,5 +1,5 @@
 name: ChestShopPlugin
-version: '1.5'
+version: '${project.version}'
 main: org.example.ChestShopPlugin
 api-version: '1.21'
 authors:

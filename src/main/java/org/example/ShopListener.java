@@ -746,7 +746,12 @@ public class ShopListener implements Listener {
                 (material.name().endsWith("_HORSE_ARMOR")) ||
                 (material.name().endsWith("_CROSSBOW")) ||
                 (material.name().endsWith("_BOW")) ||
-                material == Material.MACE;
+                material == Material.MACE ||
+                (material.name().startsWith("POTION")) ||
+                material == Material.BUNDLE ||
+                material == Material.OMINOUS_BOTTLE ||
+                material == Material.ELYTRA;
+
 
     }
 
