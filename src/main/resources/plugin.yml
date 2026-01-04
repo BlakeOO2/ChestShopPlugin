@@ -15,6 +15,7 @@ commands:
       §7/cs info - Get item name for shop creation
       §7/cs help - Show help message
       §7/cs notifications - Toggle shop notifications
+      §7/cs deleteshop
       §7/cs bypass - Toggle sign edit bypass (Admin only)
       §7/cs admin - Allows creating and managing admin shop (Admin only)
     aliases: [ chestshop ]
@@ -43,4 +44,7 @@ permissions:
     default: op
   chestshop.admin.setowner:
     description: Allows admin to set the owner name on chest shops
+    default: op
+  chestshop.delete.others:
+    description: Delete other player shops
     default: op

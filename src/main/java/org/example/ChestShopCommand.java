@@ -52,6 +52,8 @@ public class ChestShopCommand implements CommandExecutor, TabCompleter {
                 return handleSetOwnerCommand(sender, args);
             case "change":
                 return handleChangeCommand(sender, args);
+            case "deleteshop":
+                return removeShopCommand(sender, args);
             default:
                 sender.sendMessage("§cUnknown command. Type /cs help for help.");
                 return true;
@@ -164,6 +166,49 @@ public class ChestShopCommand implements CommandExecutor, TabCompleter {
                 "§cShop sign edit bypass mode §4DISABLED");
         return true;
     }
+
+
+    private boolean removeShopCommand(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) return false;
+
+
+        if (args.length < 1) {
+            sender.sendMessage("§cUsage: /cs deleteshop");
+            return true;
+        }
+
+
+
+        // Get the sign the player is looking at
+        Block targetBlock = player.getTargetBlock(null, 5);
+        if (!(targetBlock.getState() instanceof Sign sign)) {
+            player.sendMessage("§cYou must be looking at a shop sign!");
+            return true;
+        }
+
+        // Check if it's a shop
+        ChestShop shop = plugin.getShop(targetBlock.getLocation());
+        if (shop == null) {
+            player.sendMessage("§cThis is not a shop sign!");
+            return true;
+        }
+
+        // Check ownership based on the first line of the sign
+        String ownerName = sign.getLine(0);
+        if (( !ownerName.equals(player.getName()) && !player.hasPermission("chestshop.admin.setowner")) || player.hasPermission("chestshop.delete.others")) {
+            player.sendMessage("§cYou can only delete your own shops!");
+            return true;
+        }
+
+        plugin.removeShop(targetBlock.getLocation());
+        targetBlock.breakNaturally();
+
+        player.sendMessage("§aShop has been removed successfully!");
+        return true;
+
+
+    }
+
 
 
 
@@ -359,7 +404,7 @@ public class ChestShopCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
             List<String> completions = new ArrayList<>(Arrays.asList(
-                    "info", "help", "notifications", "notify", "change"
+                    "info", "help", "notifications", "notify", "change", "deleteshop"
             ));
             if (sender.hasPermission("chestshop.admin.bypass")) {
                 completions.add("bypass");
