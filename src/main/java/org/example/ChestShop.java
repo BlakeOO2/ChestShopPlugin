@@ -19,7 +19,8 @@ public class ChestShop {
     private int quantity;
     private boolean isPending;
     private boolean isAdminShop;
-    private static String adminShopDisplayName = "Admin Shop"; // Default name
+    static ChestShopPlugin plugin;
+    private String adminShopDisplayName; // Default name
 
     public ChestShop(String ownerName, Location location) {
         this.ownerName = ownerName;
@@ -28,6 +29,8 @@ public class ChestShop {
         this.buyPrice = -1;
         this.sellPrice = -1;
         this.quantity = 0;
+        plugin = ChestShopPlugin.getInstance();
+        this.adminShopDisplayName = plugin.getServerName();
     }
 
     // Getters with defensive copying
@@ -196,8 +199,13 @@ public class ChestShop {
 
     public boolean isAdminShop() { return isAdminShop; }
     public void setAdminShop(boolean adminShop) { isAdminShop = adminShop; }
-    public static void setAdminShopDisplayName(String name) { adminShopDisplayName = name; }
-    public static String getAdminShopDisplayName() { return adminShopDisplayName; }
+    public static void setAdminShopDisplayName(String name) {
+        plugin.getConfig().set("serverName", name);
+        plugin.saveConfig();
+    }
+    public static String getAdminShopDisplayName() {
+        return plugin.getConfig().getString("serverName");
+    }
 
     /**
      * Determines if an item type needs special serialization handling

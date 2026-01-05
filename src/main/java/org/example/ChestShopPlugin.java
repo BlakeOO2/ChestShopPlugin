@@ -36,10 +36,11 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 public class ChestShopPlugin extends JavaPlugin {
     private Map<Location, ChestShop> shops = new HashMap<>();
+    private static ChestShopPlugin instance;
     private Economy economy;
     private Set<UUID> bypassMode = new HashSet<>();
     private Set<UUID> chestBypassMode = new HashSet<>();
-    private String serverName = "Admin Shop";
+    private String serverName = "";
     private ShopSignHandler signHandler; // Add this line
     private NotificationManager notificationManager;
 
@@ -72,6 +73,10 @@ public class ChestShopPlugin extends JavaPlugin {
 
     public boolean isInBypassMode(Player player) {
         return bypassMode.contains(player.getUniqueId());
+    }
+
+    public String getServerName(){
+        return serverName;
     }
 
 
@@ -243,6 +248,10 @@ public class ChestShopPlugin extends JavaPlugin {
 
     public void saveShopData() {
         saveData();
+    }
+
+    public static ChestShopPlugin getInstance() {
+        return instance;
     }
 
     private void loadData() {
@@ -440,6 +449,7 @@ public class ChestShopPlugin extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        instance = this;
         if (!getDataFolder().exists()) {
             getDataFolder().mkdirs();
         }
@@ -455,6 +465,7 @@ public class ChestShopPlugin extends JavaPlugin {
         getCommand("cs").setExecutor(new ChestShopCommand(this));
         loadData();
 
+        this.serverName = getConfig().getString("serverName", "Admin Shop");
         this.notificationManager = new NotificationManager(this);
 
         this.signHandler = new ShopSignHandler(this);
