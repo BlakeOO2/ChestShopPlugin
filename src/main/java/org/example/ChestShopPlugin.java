@@ -56,9 +56,11 @@ public class ChestShopPlugin extends JavaPlugin {
 
     public boolean toggleChestBypass(Player player) {
         if (chestBypassMode.contains(player.getUniqueId())) {
+            debug(player + " removed from chest bypass mode");
             chestBypassMode.remove(player.getUniqueId());
             return false;
         } else {
+            debug(player + " added to chest bypass mode");
             chestBypassMode.add(player.getUniqueId());
             return true;
         }
@@ -442,6 +444,7 @@ public class ChestShopPlugin extends JavaPlugin {
             getDataFolder().mkdirs();
         }
 
+        saveDefaultConfig();
         if (!setupEconomy()) {
             getLogger().severe("Vault not found! Disabling plugin.");
             getServer().getPluginManager().disablePlugin(this);
@@ -506,6 +509,12 @@ public class ChestShopPlugin extends JavaPlugin {
     }
     public ShopSignHandler getSignHandler() {
         return signHandler;
+    }
+
+    public void debug(String message) {
+        if(getConfig().getBoolean("debug")) {
+            getLogger().info("[DEBUG] "+message);
+        }
     }
 
 }

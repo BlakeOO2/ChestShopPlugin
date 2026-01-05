@@ -142,6 +142,9 @@ public class ChestShopCommand implements CommandExecutor, TabCompleter {
         if (sender.hasPermission("chestshop.admin.bypass")) {
             sender.sendMessage("§f/cs bypass §7- Toggle sign edit bypass mode");
         }
+        if (sender.hasPermission("chestshop.admin.chestbypass")){
+            sender.sendMessage("§f/cs chestbypass §7- Toggle chest bypass mode");
+        }
         sender.sendMessage("§7Usage:");
         sender.sendMessage("§f- Right-click sign to buy");
         sender.sendMessage("§f- Left-click sign to sell");
@@ -166,6 +169,7 @@ public class ChestShopCommand implements CommandExecutor, TabCompleter {
                 "§cShop sign edit bypass mode §4DISABLED");
         return true;
     }
+
 
 
     private boolean removeShopCommand(CommandSender sender, String[] args) {
@@ -195,7 +199,8 @@ public class ChestShopCommand implements CommandExecutor, TabCompleter {
 
         // Check ownership based on the first line of the sign
         String ownerName = sign.getLine(0);
-        if (( !ownerName.equals(player.getName()) && !player.hasPermission("chestshop.admin.setowner")) || player.hasPermission("chestshop.delete.others")) {
+        plugin.debug("OwnerName: " +ownerName);
+        if ( !(ownerName.equals(player.getName())  || player.hasPermission("chestshop.delete.others"))) {
             player.sendMessage("§cYou can only delete your own shops!");
             return true;
         }

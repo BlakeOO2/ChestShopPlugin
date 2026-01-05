@@ -3,7 +3,7 @@ version: '${project.version}'
 main: org.example.ChestShopPlugin
 api-version: '1.21'
 authors:
-  - Hydrantz
+  - Blake
 description: A plugin that allows players to create chest shops
 depend: [Vault]
 

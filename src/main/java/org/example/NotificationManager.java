@@ -40,6 +40,7 @@ public class NotificationManager {
     }
 
     public void sendNotification(Player player, String message) {
+        //TODO create a log for chest shop transactions here
         if (player != null && player.isOnline() && hasNotificationsEnabled(player.getUniqueId())) {
             player.sendMessage(message);
         }

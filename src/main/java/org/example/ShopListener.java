@@ -4,6 +4,7 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.*;
 import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -58,25 +59,32 @@ public class ShopListener implements Listener {
                 lines[1].matches("^[BS]\\d+(?::[BS]\\d+)?$");
     }
 
-    @EventHandler(priority = EventPriority.HIGH)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onContainerAccess(PlayerInteractEvent event) {
+        plugin.debug("Container access event: " + event.getAction());
         if (event.getAction() != Action.RIGHT_CLICK_BLOCK || event.getClickedBlock() == null) {
             return;
         }
 
+        plugin.debug("Block clicked: " + event.getClickedBlock().getType());
         Block block = event.getClickedBlock();
         if (!(block.getState() instanceof Container)) {
             return;
         }
 
         // Check if this container is part of a shop
+        plugin.debug("Block state: " + block.getState().getClass().getSimpleName());
         Block signBlock = findAttachedSign(block);
         if (signBlock == null) {
+            plugin.debug("No attached sign found!");
             return;
         }
+        plugin.debug("Attached sign: " + signBlock.getType());
 
         ChestShop shop = plugin.getShop(signBlock.getLocation());
+        plugin.debug("Shop: " + shop);
         if (shop == null) {
+            plugin.debug("Shop not found!");
             return;
         }
 
@@ -86,29 +94,37 @@ public class ShopListener implements Listener {
         // 1. Player is the owner
         // 2. Player has chest bypass enabled and permission
         // 3. It's an admin shop and player has admin shop access permission
-        if (shop.getOwnerName().equals(player.getName()) ||
-                (player.hasPermission("chestshop.admin.chestbypass") && plugin.isInChestBypassMode(player)) ||
+        plugin.debug("Shop owner: " + shop.getOwnerName() + ", player: " + player.getName() + ", bypass mode:" + plugin.isInChestBypassMode(player));
+        plugin.debug("Admin shop access: " + player.hasPermission("chestshop.admin.access"));
+        if (shop.getOwnerName().equals(player.getName()) || (player.hasPermission("chestshop.admin.chestbypass") && plugin.isInChestBypassMode(player)) ||
                 (shop.isAdminShop() && player.hasPermission("chestshop.admin.access"))) {
+            plugin.debug("Access granted!");
             return;
         }
 
         // Deny access
+        event.setUseInteractedBlock(Event.Result.DENY);
         event.setCancelled(true);
         player.sendMessage("§cYou don't have permission to access this shop container!");
     }
 
     private Block findAttachedSign(Block chestBlock) {
-        for (BlockFace face : new BlockFace[]{BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST}) {
+        for (BlockFace face : new BlockFace[]{BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST, BlockFace.UP}) {
+
             Block relative = chestBlock.getRelative(face);
-            if (relative.getState() instanceof Sign && relative.getBlockData() instanceof WallSign) {
-                WallSign sign = (WallSign) relative.getBlockData();
-                if (sign.getFacing().getOppositeFace() == face) {
-                    return relative;
-                }
+
+            if (!(relative.getBlockData() instanceof WallSign sign)) continue;
+
+            Block attachedTo = relative.getRelative(sign.getFacing().getOppositeFace());
+
+            if (attachedTo.equals(chestBlock)) {
+                return relative;
             }
         }
+
         return null;
     }
+
 
 
     private void createNewShop(SignChangeEvent event) {
