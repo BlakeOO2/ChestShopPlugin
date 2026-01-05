@@ -53,11 +53,11 @@ public class ShopListener implements Listener {
     }
 
     private boolean isShopSign(String[] lines) {
-        // Check if the sign follows shop format (has B/S price format on line 2)
         return lines[1] != null &&
                 (lines[1].startsWith("B") || lines[1].startsWith("S")) &&
-                lines[1].matches("^[BS]\\d+(?::[BS]\\d+)?$");
+                lines[1].matches("^[BS]\\d+(?:[KMB])?(?::[BS]\\d+(?:[KMB])?)?$");
     }
+
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onContainerAccess(PlayerInteractEvent event) {

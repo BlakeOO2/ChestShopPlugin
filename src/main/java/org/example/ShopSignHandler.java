@@ -23,10 +23,14 @@ public class ShopSignHandler {
     public PriceInfo parsePriceLine(String priceLine) {
         double buyPrice = -1;
         double sellPrice = -1;
+        plugin.debug("1 BuyPrice: " + buyPrice + " SellPrice: " + sellPrice);
+
 
         if (priceLine == null || priceLine.isEmpty()) {
             return new PriceInfo(-1, -1);
         }
+
+        plugin.debug("2 BuyPrice: " + buyPrice + " SellPrice: " + sellPrice);
 
         try {
             // Format: BX:SX or B$X:S$X or BX or B$X or SX or S$X or BFREE:SX or BX:SFREE or BFREE or SFREE
@@ -39,7 +43,7 @@ public class ShopSignHandler {
                     if (priceStr.equalsIgnoreCase("FREE")) {
                         buyPrice = 0;
                     } else {
-                        buyPrice = Double.parseDouble(priceStr);
+                        buyPrice = parseNumberWithSuffix(priceStr);
                     }
                 }
                 if (parts[1].startsWith("S")) {
@@ -48,7 +52,7 @@ public class ShopSignHandler {
                     if (priceStr.equalsIgnoreCase("FREE")) {
                         sellPrice = 0;
                     } else {
-                        sellPrice = Double.parseDouble(priceStr);
+                        sellPrice = parseNumberWithSuffix(priceStr);
                     }
                 }
             } else if (priceLine.startsWith("B")) {
@@ -57,7 +61,7 @@ public class ShopSignHandler {
                 if (priceStr.equalsIgnoreCase("FREE")) {
                     buyPrice = 0;
                 } else {
-                    buyPrice = Double.parseDouble(priceStr);
+                    buyPrice = parseNumberWithSuffix(priceStr);
                 }
             } else if (priceLine.startsWith("S")) {
                 // Sell only
@@ -65,13 +69,14 @@ public class ShopSignHandler {
                 if (priceStr.equalsIgnoreCase("FREE")) {
                     sellPrice = 0;
                 } else {
-                    sellPrice = Double.parseDouble(priceStr);
+                    sellPrice = parseNumberWithSuffix(priceStr);
                 }
             }
         } catch (NumberFormatException e) {
             return new PriceInfo(-1, -1);
         }
 
+        plugin.debug("3 BuyPrice: " + buyPrice + " SellPrice: " + sellPrice);
         return new PriceInfo(buyPrice, sellPrice);
     }
 
@@ -106,6 +111,26 @@ public class ShopSignHandler {
 
         // Update the sign
         sign.update();
+    }
+
+
+    private double parseNumberWithSuffix(String text) {
+        text = text.trim().toUpperCase();
+
+        double multiplier = 1;
+
+        if (text.endsWith("K")) {
+            multiplier = 1_000;
+            text = text.substring(0, text.length() - 1);
+        } else if (text.endsWith("M")) {
+            multiplier = 1_000_000;
+            text = text.substring(0, text.length() - 1);
+        } else if (text.endsWith("B")) {
+            multiplier = 1_000_000_000;
+            text = text.substring(0, text.length() - 1);
+        }
+
+        return Double.parseDouble(text) * multiplier;
     }
 
 

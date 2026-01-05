@@ -19,7 +19,7 @@ public class ChestShop {
     private int quantity;
     private boolean isPending;
     private boolean isAdminShop;
-    static ChestShopPlugin plugin;
+    static ChestShopPlugin plugin = ChestShopPlugin.getInstance();
     private String adminShopDisplayName; // Default name
 
     public ChestShop(String ownerName, Location location) {
@@ -29,7 +29,6 @@ public class ChestShop {
         this.buyPrice = -1;
         this.sellPrice = -1;
         this.quantity = 0;
-        plugin = ChestShopPlugin.getInstance();
         this.adminShopDisplayName = plugin.getServerName();
     }
 
