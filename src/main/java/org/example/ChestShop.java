@@ -1,6 +1,8 @@
 package org.example;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -9,9 +11,11 @@ import org.bukkit.inventory.meta.EnchantmentStorageMeta;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 public class ChestShop {
     private String ownerName;
+    private final UUID ownerUUID;
     private Location location;
     private ItemStack item;
     private double buyPrice;
@@ -22,15 +26,34 @@ public class ChestShop {
     static ChestShopPlugin plugin = ChestShopPlugin.getInstance();
     private String adminShopDisplayName; // Default name
 
-    public ChestShop(String ownerName, Location location) {
+    public ChestShop(
+            String ownerName,
+            UUID ownerUUID,
+            Location location,
+            boolean isAdminShop
+    ) {
         this.ownerName = ownerName;
-        this.location = location.clone(); // Clone location to prevent external modification
+        this.ownerUUID = ownerUUID;
+        this.location = location.clone();
+        this.isAdminShop = isAdminShop;
+
         this.isPending = false;
         this.buyPrice = -1;
         this.sellPrice = -1;
         this.quantity = 0;
         this.adminShopDisplayName = plugin.getServerName();
     }
+
+    public ChestShop(String ownerName, Location location, boolean isAdminShop) {
+        this(
+                ownerName,
+                Bukkit.getOfflinePlayer(ownerName).getUniqueId(),
+                location,
+                isAdminShop
+        );
+    }
+
+
 
     // Getters with defensive copying
     public String getOwnerName() { return ownerName; }
@@ -75,10 +98,15 @@ public class ChestShop {
         return !isPending && item != null && quantity > 0 && (buyPrice > 0 || sellPrice > 0);
     }
 
-    public ChestShop(String ownerName, Location location, boolean isAdminShop) {
-        this(ownerName, location);
-        this.isAdminShop = isAdminShop;
+    public ChestShop(Player owner, Location location, boolean isAdminShop) {
+        this(owner.getName(), owner.getUniqueId(), location, isAdminShop);
     }
+
+
+    public UUID getOwnerUUID() {
+        return ownerUUID;
+    }
+
 
     // Serialization
     public Map<String, Object> serialize() {
@@ -123,7 +151,15 @@ public class ChestShop {
             String owner = (String) data.get("owner");
             Location location = Location.deserialize((Map<String, Object>) data.get("location"));
 
-            ChestShop shop = new ChestShop(owner, location);
+            UUID ownerUuid = Bukkit.getOfflinePlayer(owner).getUniqueId();
+
+            ChestShop shop = new ChestShop(
+                    owner,
+                    ownerUuid,
+                    location,
+                    (Boolean) data.getOrDefault("isAdminShop", false)
+            );
+
 
             if (data.containsKey("buyPrice")) {
                 shop.setBuyPrice(((Number) data.get("buyPrice")).doubleValue());

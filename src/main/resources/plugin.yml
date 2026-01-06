@@ -48,3 +48,9 @@ permissions:
   chestshop.delete.others:
     description: Delete other player shops
     default: op
+  chestshop.history.self:
+    description: Be able to open the tabs that shows the players history of items bought/sold to their shop
+    default: true
+  chestshop.history.others:
+    description: Be able to see the chest shop historys of others
+    default: op

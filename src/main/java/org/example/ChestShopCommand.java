@@ -1,5 +1,9 @@
 package org.example;
 
+import net.md_5.bungee.api.ChatColor;
+import net.md_5.bungee.api.chat.ClickEvent;
+import net.md_5.bungee.api.chat.TextComponent;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.Sign;
@@ -12,11 +16,13 @@ import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.Arrays;
 
 public class ChestShopCommand implements CommandExecutor, TabCompleter {
     private final ChestShopPlugin plugin;
+    private static final int PAGE_SIZE = 10; //TODO put this in the config
 
     public ChestShopCommand(ChestShopPlugin plugin) {
         this.plugin = plugin;
@@ -52,6 +58,8 @@ public class ChestShopCommand implements CommandExecutor, TabCompleter {
                 return handleSetOwnerCommand(sender, args);
             case "change":
                 return handleChangeCommand(sender, args);
+            case "history":
+                return handleShopHistoryCommand(sender, args);
             case "deleteshop":
                 return removeShopCommand(sender, args);
             default:
@@ -212,6 +220,111 @@ public class ChestShopCommand implements CommandExecutor, TabCompleter {
         return true;
 
 
+    }
+
+    private boolean handleShopHistoryCommand(CommandSender sender, String[] args) {
+
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage("§cPlayers only.");
+            return true;
+        }
+
+        Player target = args.length == 1 ? player : Bukkit.getPlayer(args[1]);
+        plugin.debug("Target: " + target);
+        int page = 1;
+
+        // if they included a page argument
+        if (args.length >= 3) {
+            try {
+                page = Math.max(1, Integer.parseInt(args[2]));
+            } catch (NumberFormatException ignored) {
+                sender.sendMessage("§cInvalid page number.");
+                return true;
+            }
+        }
+
+        if (target == null) {
+            sender.sendMessage("§cPlayer not found.");
+            return true;
+        }
+
+        if (target == player) {
+            if (!sender.hasPermission("chestshop.history.self")) {
+                sender.sendMessage("§cYou do not have permission to view your own history.");
+                return true;
+            }
+
+            sendHistoryToPlayer(player, target, page);
+            return true;
+
+        } else {
+            if (!sender.hasPermission("chestshop.history.others")) {
+                sender.sendMessage("§cYou do not have permission to view other players' history.");
+                return true;
+            }
+
+            sendHistoryToPlayer(player, target, page);
+            return true;
+        }
+    }
+
+
+    private void sendHistoryToPlayer(Player viewer, Player target, int page) {
+
+        UUID owner = target.getUniqueId();
+        plugin.debug("Owner: " + owner);
+        List<String> history = plugin.getHistoryManager().getHistory(owner);
+
+        if (history.isEmpty()) {
+            viewer.sendMessage(ChatColor.RED + "Player has no Chest Shop history.");
+            return;
+        }
+
+        int totalPages = (int) Math.ceil(history.size() / (double) PAGE_SIZE);
+
+        if (page < 1) page = 1;
+        if (page > totalPages) page = totalPages;
+
+        int start = (page - 1) * PAGE_SIZE;
+        int end = Math.min(start + PAGE_SIZE, history.size());
+
+        viewer.sendMessage(ChatColor.GOLD + "====== ChestShop History (" +
+                ChatColor.WHITE + "Page " + page + " / " + totalPages +
+                ChatColor.GOLD + ") ======");
+
+        for (int i = start; i < end; i++) {
+            viewer.sendMessage(ChatColor.GRAY + "• " + history.get(i));
+        }
+
+        // --- Navigation bar ---
+        TextComponent nav = new TextComponent("");
+
+        // PREVIOUS
+        if (page > 1) {
+            TextComponent prev = new TextComponent(ChatColor.DARK_GRAY + "[ " + ChatColor.YELLOW + "Previous" + ChatColor.DARK_GRAY + " ]");
+            prev.setClickEvent(new ClickEvent(
+                    ClickEvent.Action.RUN_COMMAND,
+                    "/cs history " + target.getName() + " " + (page - 1)
+            ));
+
+            nav.addExtra(prev);
+            nav.addExtra("  ");
+        }
+
+        // NEXT
+        if (page < totalPages) {
+            TextComponent next = new TextComponent(ChatColor.DARK_GREEN + "[ " + ChatColor.GREEN + "Next" + ChatColor.DARK_GREEN + " ]");
+            next.setClickEvent(new ClickEvent(
+                    ClickEvent.Action.RUN_COMMAND,
+                    "/cs history " + target.getName() + " " + (page + 1)
+            ));
+
+            nav.addExtra(next);
+        }
+
+        if (nav.getExtra() != null && !nav.getExtra().isEmpty()) {
+            viewer.spigot().sendMessage(nav);
+        }
     }
 
 

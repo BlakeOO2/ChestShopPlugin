@@ -1,6 +1,7 @@
 package org.example;
 
 import net.milkbowl.vault.economy.Economy;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.block.Block;
 import org.bukkit.block.ShulkerBox;
@@ -30,8 +31,7 @@ import org.bukkit.inventory.meta.EnchantmentStorageMeta;
 import org.bukkit.block.ShulkerBox;
 import org.bukkit.inventory.meta.BlockStateMeta;
 import org.bukkit.inventory.meta.ItemMeta;
-
-
+import org.example.Manager.HistoryManager;
 
 
 public class ChestShopPlugin extends JavaPlugin {
@@ -43,7 +43,7 @@ public class ChestShopPlugin extends JavaPlugin {
     private String serverName = "";
     private ShopSignHandler signHandler; // Add this line
     private NotificationManager notificationManager;
-
+    private HistoryManager historyManager;
 
     public boolean toggleBypass(Player player) {
         if (bypassMode.contains(player.getUniqueId())) {
@@ -96,6 +96,7 @@ public class ChestShopPlugin extends JavaPlugin {
             ChestShop shop = entry.getValue();
             Map<String, Object> shopData = new HashMap<>();
             shopData.put("owner", shop.getOwnerName());
+            shopData.put("ownerUuid", shop.getOwnerUUID().toString());
             shopData.put("buyPrice", shop.getBuyPrice());
             shopData.put("sellPrice", shop.getSellPrice());
             shopData.put("quantity", shop.getQuantity());
@@ -280,8 +281,32 @@ public class ChestShopPlugin extends JavaPlugin {
                     ConfigurationSection dataSection = shopSection.getConfigurationSection("data");
                     if (dataSection == null) continue;
 
-                    String owner = dataSection.getString("owner");
-                    ChestShop shop = new ChestShop(owner, location);
+                    String ownerName = dataSection.getString("owner");
+                    String ownerUuidStr = dataSection.getString("ownerUuid");
+
+                    UUID ownerUuid;
+
+                    if (ownerUuidStr != null) {
+                        // New format — proper UUID
+                        ownerUuid = UUID.fromString(ownerUuidStr);
+                    } else {
+                        // Legacy shop — resolve UUID from Bukkit
+                        // (may be online or offline, still fine)
+                        ownerUuid = Bukkit.getOfflinePlayer(ownerName).getUniqueId();
+
+                        // Save back to config on next save()
+                        dataSection.set("ownerUuid", ownerUuid.toString());
+                    }
+
+                    boolean isAdmin = dataSection.getBoolean("isAdminShop", false);
+
+                    ChestShop shop = new ChestShop(
+                            ownerName,
+                            ownerUuid,
+                            location,
+                            isAdmin
+                    );
+
 
                     shop.setBuyPrice(dataSection.getDouble("buyPrice", -1));
                     shop.setSellPrice(dataSection.getDouble("sellPrice", -1));
@@ -465,6 +490,7 @@ public class ChestShopPlugin extends JavaPlugin {
         getCommand("cs").setExecutor(new ChestShopCommand(this));
         loadData();
 
+        this.historyManager = new HistoryManager(this);
         this.serverName = getConfig().getString("serverName", "Admin Shop");
         this.notificationManager = new NotificationManager(this);
 
@@ -513,6 +539,9 @@ public class ChestShopPlugin extends JavaPlugin {
         return economy;
     }
 
+    public HistoryManager getHistoryManager() {
+        return historyManager;
+    }
     public void setServerName(String name) {
         this.serverName = name;
         ChestShop.setAdminShopDisplayName(name);

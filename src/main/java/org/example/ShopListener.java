@@ -19,6 +19,7 @@ import net.milkbowl.vault.economy.Economy;
 import org.example.ShopSignHandler.PriceInfo;
 
 import java.util.HashMap;
+import java.util.UUID;
 
 
 public class ShopListener implements Listener {
@@ -392,6 +393,18 @@ public class ShopListener implements Listener {
                         shop.getItem().getType().name().toLowerCase().replace("_", " "),
                         priceText
                 );
+
+                plugin.getHistoryManager().addTransaction(
+                        shop.getOwnerUUID(),
+                        true,
+                        player.getUniqueId(),
+                        shop.getQuantity(),
+                        shop.getBuyPrice(),
+                        shop.getItem().getType(),
+                        true
+                );
+
+
                 plugin.getNotificationManager().sendNotification(owner, notification);
             }
         }
@@ -502,6 +515,17 @@ public class ShopListener implements Listener {
                         itemName,
                         priceText
                 );
+                plugin.getHistoryManager().addTransaction(
+                        shop.getOwnerUUID(),
+                        false,
+                        player.getUniqueId(),
+                        shop.getQuantity(),
+                        shop.getSellPrice(),
+                        shop.getItem().getType(),
+                        true
+                );
+
+
                 plugin.getNotificationManager().sendNotification(owner, notification);
             }
         }
