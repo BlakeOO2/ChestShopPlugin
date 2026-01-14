@@ -304,7 +304,7 @@ public class ChestShopCommand implements CommandExecutor, TabCompleter {
             TextComponent prev = new TextComponent(ChatColor.DARK_GRAY + "[ " + ChatColor.YELLOW + "Previous" + ChatColor.DARK_GRAY + " ]");
             prev.setClickEvent(new ClickEvent(
                     ClickEvent.Action.RUN_COMMAND,
-                    "/cs history " + target.getName() + " " + (page - 1)
+                    "/chestshop history " + target.getName() + " " + (page - 1)
             ));
 
             nav.addExtra(prev);
@@ -316,7 +316,7 @@ public class ChestShopCommand implements CommandExecutor, TabCompleter {
             TextComponent next = new TextComponent(ChatColor.DARK_GREEN + "[ " + ChatColor.GREEN + "Next" + ChatColor.DARK_GREEN + " ]");
             next.setClickEvent(new ClickEvent(
                     ClickEvent.Action.RUN_COMMAND,
-                    "/cs history " + target.getName() + " " + (page + 1)
+                    "/chestshop history " + target.getName() + " " + (page + 1)
             ));
 
             nav.addExtra(next);

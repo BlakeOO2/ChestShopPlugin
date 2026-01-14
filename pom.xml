@@ -6,9 +6,10 @@
 
     <groupId>org.example</groupId>
     <artifactId>ChestShopPlugin</artifactId>
-    <version>1.7</version>
+    <version>1.8</version>
 
     <properties>
+        <maven.compiler.release>17</maven.compiler.release>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -64,6 +65,13 @@
                 </exclusion>
             </exclusions>
         </dependency>
+        <!--Bstats-->
+        <dependency>
+            <groupId>org.bstats</groupId>
+            <artifactId>bstats-bukkit</artifactId>
+            <version>3.1.0</version>
+            <scope>compile</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -81,7 +89,18 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <version>3.2.4</version>
+                <version>3.5.3</version>
+
+                <configuration>
+                    <minimizeJar>false</minimizeJar>
+                    <relocations>
+                        <relocation>
+                            <pattern>org.bstats</pattern>
+                            <shadedPattern>org.example.bstats</shadedPattern>
+                        </relocation>
+                    </relocations>
+                </configuration>
+
                 <executions>
                     <execution>
                         <phase>package</phase>
@@ -91,6 +110,7 @@
                     </execution>
                 </executions>
             </plugin>
+
         </plugins>
         <resources>
             <resource>

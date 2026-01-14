@@ -280,9 +280,23 @@ public class ShopListener implements Listener {
 
         // Handle buying/selling based on click type
         if (event.getAction() == Action.RIGHT_CLICK_BLOCK) {
-            handleBuying(player, shop);
+
+                handleBuying(player, shop);
         } else if (event.getAction() == Action.LEFT_CLICK_BLOCK) {
-            handleSelling(player, shop);
+            if(player.isSneaking()){
+                Container container = getAttachedContainer(block);
+                if (container == null) return;
+
+                int stock = getAvailableItemsInContainer(container, shop.getItem(), shop);
+                int space = getFreeSpaceInContainer(container, shop.getItem(), shop);
+
+                player.sendMessage("§6--- Shop Info ---");
+                player.sendMessage("§aStock: §f" + (stock == Integer.MAX_VALUE ? "∞" : stock));
+                player.sendMessage("§aFree space: §f" + (space == Integer.MAX_VALUE ? "∞" : space));
+                return;
+            } else {
+                handleSelling(player, shop);
+            }
         }
     }
     private void handleBuying(Player player, ChestShop shop) {
@@ -842,6 +856,59 @@ public class ShopListener implements Listener {
         player.sendMessage("§aShop removed successfully!");
     }
 
+
+
+    private int getFreeSpaceInContainer(Container container, ItemStack item, ChestShop shop) {
+        if (shop.isAdminShop()) {
+            return Integer.MAX_VALUE; // effectively infinite
+        }
+
+        Material type = item.getType();
+        boolean special = isSpecialItem(type);
+        int freeSpace = 0;
+        int maxStack = item.getMaxStackSize();
+
+        for (ItemStack stack : container.getInventory().getContents()) {
+            if (stack == null) {
+                freeSpace += maxStack;
+            } else if (special) {
+                if (stack.getType() == type) {
+                    freeSpace += maxStack - stack.getAmount();
+                }
+            } else {
+                if (stack.isSimilar(item)) {
+                    freeSpace += maxStack - stack.getAmount();
+                }
+            }
+        }
+        return freeSpace;
+    }
+
+
+    private int getAvailableItemsInContainer(Container container, ItemStack item, ChestShop shop) {
+        if (shop.isAdminShop()) {
+            return Integer.MAX_VALUE; // infinite stock
+        }
+
+        Material type = item.getType();
+        boolean special = isSpecialItem(type);
+        int count = 0;
+
+        for (ItemStack stack : container.getInventory().getContents()) {
+            if (stack == null) continue;
+
+            if (special) {
+                if (stack.getType() == type) {
+                    count += stack.getAmount();
+                }
+            } else {
+                if (stack.isSimilar(item)) {
+                    count += stack.getAmount();
+                }
+            }
+        }
+        return count;
+    }
 
 
 

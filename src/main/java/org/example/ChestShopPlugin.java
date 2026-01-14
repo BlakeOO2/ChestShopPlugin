@@ -1,6 +1,8 @@
 package org.example;
 
 import net.milkbowl.vault.economy.Economy;
+import org.bstats.bukkit.Metrics;
+import org.bstats.charts.SimplePie;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.block.Block;
@@ -485,6 +487,13 @@ public class ChestShopPlugin extends JavaPlugin {
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
+
+
+        int pluginId = 28730;
+        Metrics metrics = new Metrics(this, pluginId);
+        metrics.addCustomChart(
+                new SimplePie("chart_id", () -> "My value")
+        );
 
         getServer().getPluginManager().registerEvents(new ShopListener(this), this);
         getCommand("cs").setExecutor(new ChestShopCommand(this));

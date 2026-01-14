@@ -64,16 +64,13 @@ public class HistoryManager {
             return result;
         }
 
-        // Keeps insertion order while counting duplicates
         Map<String, Integer> counts = new LinkedHashMap<>();
 
         try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
             String line;
-
             while ((line = reader.readLine()) != null) {
                 counts.put(line, counts.getOrDefault(line, 0) + 1);
             }
-
         } catch (IOException e) {
             plugin.getLogger().severe("Failed to read history file: " + e.getMessage());
         }
@@ -89,7 +86,11 @@ public class HistoryManager {
             }
         }
 
+        // 🔁 Reverse so newest is first
+        Collections.reverse(result);
+
         return result;
     }
+
 
 }
